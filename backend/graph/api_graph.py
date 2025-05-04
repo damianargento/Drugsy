@@ -55,12 +55,16 @@ def create_api_graph(llm_with_tools, tools, system_prompt, welcome_msg):
         defaults = {"order": [], "finished": False}
     
         if state["messages"]:
-            # Convert system_prompt tuple to a SystemMessage if it's a tuple
-            if isinstance(system_prompt, tuple):
-                system_content = system_prompt[1]
-                system_message = SystemMessage(content=system_content)
+            # Usar el mensaje de sistema personalizado si está disponible
+            if "system_message" in state:
+                system_message = SystemMessage(content=state["system_message"])
             else:
-                system_message = SystemMessage(content=system_prompt)
+                # Convert system_prompt tuple to a SystemMessage if it's a tuple
+                if isinstance(system_prompt, tuple):
+                    system_content = system_prompt[1]
+                    system_message = SystemMessage(content=system_content)
+                else:
+                    system_message = SystemMessage(content=system_prompt)
                 
             # Invoke the LLM with the system message and the state messages
             new_output = llm_with_tools.invoke([system_message] + state["messages"])
@@ -108,6 +112,11 @@ def process_message(graph, state, message_content):
     
     # Add the message to the state
     new_state["messages"] = new_state["messages"] + [HumanMessage(content=message_content)]
+    
+    # Si hay un mensaje de sistema personalizado, lo usamos
+    if "system_message" in state:
+        # Guardamos el mensaje de sistema en el nuevo estado
+        new_state["system_message"] = state["system_message"]
     
     # Process the message through the graph
     result_state = graph.invoke(new_state)
