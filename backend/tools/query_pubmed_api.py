@@ -42,11 +42,17 @@ def query_pubmed_api(query: str, max_results: int = 3) -> str:
         "tool": "Drugsy",
         "email": "drugsy@gmail.com"
     }
+    
+    # Usar logging en lugar de print
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
     print(fetch_params)
 
     fetch_response = requests.get(fetch_url, params=fetch_params)
     if fetch_response.status_code != 200:
         return f"Failed to fetch PubMed details for '{query}'."
+    
     print(fetch_response)
     # Step 3: Parse the XML response
     root = ET.fromstring(fetch_response.content)

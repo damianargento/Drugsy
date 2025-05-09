@@ -26,16 +26,14 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Drug Interaction Bot API")
 
-# Configure CORS for dev mode
-if os.getenv("DEV_MODE") == "True":
-    # Configure CORS
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+# Configure CORS for all environments
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Include authentication routes
 app.include_router(auth_routes.router)
@@ -53,8 +51,22 @@ def get_graph_with_tools(user_info=None):
         # Obtenemos el tipo y contenido del mensaje de sistema original
         system_type, system_content = DRUG_INTERACTION_BOT
         
-        # Añadimos la información del usuario al principio del mensaje de sistema
-        personalized_content = f"El usuario está autenticado. Su nombre es {user_info['first_name']} {user_info['last_name']}. Dirígete a él por su nombre en tus respuestas.\n\n{system_content}"
+        # Preparamos la información básica del usuario
+        user_info_text = f"El usuario está autenticado. Su nombre es {user_info['first_name']} {user_info['last_name']}. Dirígete a él por su nombre en tus respuestas."
+        
+        # Añadimos información de medicación si está disponible
+        if 'medications' in user_info and user_info['medications']:
+            medications_text = "\n\nEl usuario toma las siguientes medicaciones:\n"
+            for med in user_info['medications']:
+                medications_text += f"- {med['name']}: {med['dosage']}, {med['frequency']}\n"
+            user_info_text += medications_text
+        
+        # Añadimos información de patologías crónicas si está disponible
+        if 'chronic_conditions' in user_info and user_info['chronic_conditions']:
+            user_info_text += f"\n\nEl usuario tiene las siguientes patologías crónicas:\n{user_info['chronic_conditions']}"
+        
+        # Añadimos toda la información del usuario al principio del mensaje de sistema
+        personalized_content = f"{user_info_text}\n\n{system_content}"
         
         # Creamos un nuevo mensaje de sistema personalizado
         personalized_system_prompt = (system_type, personalized_content)
@@ -112,22 +124,32 @@ async def chat(request: PromptRequest, current_user: schemas.User = Depends(get_
         
         # Si el usuario está autenticado y es una nueva conversación, creamos un grafo personalizado
         if current_user and conversation_id not in conversations:
-            # Creamos un grafo personalizado con la información del usuario
-            user_graph = get_graph_with_tools({
+            # Preparamos la información completa del usuario para el grafo personalizado
+            user_info = {
                 'first_name': current_user.first_name,
-                'last_name': current_user.last_name
-            })
+                'last_name': current_user.last_name,
+                'medications': current_user.medications,
+                'chronic_conditions': current_user.chronic_conditions
+            }
+            
+            # Creamos un grafo personalizado con toda la información del usuario
+            user_graph = get_graph_with_tools(user_info)
             
             # Inicializamos el estado con el grafo personalizado
             state = user_graph.invoke({"messages": []})
             conversations[conversation_id] = state
         # Si el usuario está autenticado, usamos el grafo personalizado
         if current_user and conversation_id in conversations:
-            # Usamos el grafo personalizado para procesar el mensaje
-            user_graph = get_graph_with_tools({
+            # Preparamos la información completa del usuario para el grafo personalizado
+            user_info = {
                 'first_name': current_user.first_name,
-                'last_name': current_user.last_name
-            })
+                'last_name': current_user.last_name,
+                'medications': current_user.medications,
+                'chronic_conditions': current_user.chronic_conditions
+            }
+            
+            # Usamos el grafo personalizado para procesar el mensaje
+            user_graph = get_graph_with_tools(user_info)
             result_state = process_message(user_graph, state, user_prompt)
         else:
             # Usamos el grafo original para procesar el mensaje

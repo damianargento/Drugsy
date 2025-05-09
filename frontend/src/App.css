@@ -1,0 +1,17 @@
+/* App styles are now in Chat.css */
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background-color: #141c20;
+  color: white;
+  border-bottom: 1px solid #1A202C;
+}
+
+.logo {
+    width:200px;
+    margin-top:-20px;
+    margin-bottom:-20px;
+  }

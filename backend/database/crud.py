@@ -20,12 +20,24 @@ def create_user(db: Session, user: schemas.UserCreate):
     
     # Create new user
     hashed_password = models.User.get_password_hash(user.password)
-    db_user = models.User(
-        email=user.email,
-        first_name=user.first_name,
-        last_name=user.last_name,
-        hashed_password=hashed_password
-    )
+    
+    # Preparar datos para la creación del usuario
+    user_data = {
+        "email": user.email,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "hashed_password": hashed_password,
+    }
+    
+    # Añadir campos opcionales solo si están presentes
+    if user.medications is not None:
+        user_data["medications"] = [med.dict() for med in user.medications]
+    
+    if user.chronic_conditions is not None:
+        user_data["chronic_conditions"] = user.chronic_conditions
+    
+    # Crear el objeto de usuario
+    db_user = models.User(**user_data)
     
     # Add to database
     db.add(db_user)
@@ -41,7 +53,7 @@ def authenticate_user(db: Session, email: str, password: str) -> Optional[models
         return None
     return user
 
-def update_user(db: Session, user_id: int, user_data: schemas.UserBase):
+def update_user(db: Session, user_id: int, user_data: schemas.UserUpdate):
     db_user = get_user_by_id(db, user_id)
     if not db_user:
         raise HTTPException(
@@ -50,8 +62,10 @@ def update_user(db: Session, user_id: int, user_data: schemas.UserBase):
         )
     
     # Update user data
-    for key, value in user_data.dict().items():
-        setattr(db_user, key, value)
+    update_data = user_data.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        if value is not None:  # Solo actualizar campos que no son None
+            setattr(db_user, key, value)
     
     db.commit()
     db.refresh(db_user)

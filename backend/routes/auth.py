@@ -35,3 +35,8 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
 def read_users_me(current_user: schemas.User = Depends(auth.get_current_active_user)):
     """Get current user information"""
     return current_user
+
+@router.put("/users/me", response_model=schemas.User)
+def update_user_settings(user_data: schemas.UserUpdate, current_user: schemas.User = Depends(auth.get_current_active_user), db: Session = Depends(get_db)):
+    """Update user settings"""
+    return crud.update_user(db=db, user_id=current_user.id, user_data=user_data)

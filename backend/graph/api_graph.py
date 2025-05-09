@@ -65,6 +65,8 @@ def create_api_graph(llm_with_tools, tools, system_prompt, welcome_msg):
                     system_message = SystemMessage(content=system_content)
                 else:
                     system_message = SystemMessage(content=system_prompt)
+            
+            # Mantener el comportamiento original sin modificaciones
                 
             # Invoke the LLM with the system message and the state messages
             new_output = llm_with_tools.invoke([system_message] + state["messages"])
