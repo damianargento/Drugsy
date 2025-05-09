@@ -75,7 +75,6 @@ function App() {
     try {
       // Obtenemos el token
       const token = authService.getToken();
-      console.log('Token enviado:', token);
       
       // Send message directly to the API
       const response = await axios.post('http://localhost:9000/chat', {
