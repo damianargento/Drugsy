@@ -22,6 +22,8 @@ from routes import auth as auth_routes
 
 dotenv.load_dotenv()
 
+port = int(os.environ.get("PORT", 8080))
+
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
@@ -180,4 +182,4 @@ async def get_conversation(conversation_id: str, current_user: schemas.User = De
     }
 
 if __name__ == "__main__":
-    uvicorn.run("api:app", host="0.0.0.0", port=9000, reload=True)
+    uvicorn.run("api:app", host="0.0.0.0", port=port, reload=True)

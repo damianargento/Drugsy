@@ -60,7 +60,6 @@ DRUG_INTERACTION_BOT = (
 # Welcome message for the Drug Interaction Bot
 WELCOME_MSG = """
     Hello! I'm Drugsy! 
-    I'm here to help you understand how the food you eat can interact with the drugs you're taking. 
-    Just let me know what drug you're taking and what you'd like to know about how it interacts with food.
-    I cannot give medical advice or recommendations, please ask to you a doctor or pharmacist for medical advice.
+    I'm here to help you manage your medications and how they can interact with new prescriptions and foods. 
+    If you log-in I will be able to access your medications and chronic conditions to provide personalized information if not, just share your questions and I'll do my best to help you.
     """

@@ -10,3 +10,6 @@ passlib
 python-jose
 email-validator
 python-multipart
+psycopg2-binary
+bcrypt
+docker

@@ -1,38 +1,185 @@
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from typing import Dict, Any
+import uuid
 from models.llm import llm
+from models.chat_models import PromptRequest, BotResponse
 from tools.fda_api import query_fda_api
-
-# Import the graph module
-from graph.drug_interaction_graph import create_graph
+from tools.pubmed_api import query_pubmed_api
+from tools.usda_api import query_usda_food_data
+from graph.api_graph import create_api_graph, ApiState, process_message
 from config.prompts import DRUG_INTERACTION_BOT, WELCOME_MSG
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+import uvicorn
+import os
+import dotenv
+
+# Database imports
+from database import Base, engine
+from database.auth import get_current_active_user, get_current_user_optional
+from database import schemas
+from routes import auth as auth_routes
+
+dotenv.load_dotenv()
+
+port = int(os.environ.get("PORT", 8080))
+
+# Create database tables
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(title="Drugsy, the healthy chatbot", description="API for drug interaction bot", version="1.0.0")
+
+if os.getenv("DEV_MODE") == "True":
+    # Configure CORS for all environments
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+# Include authentication routes
+app.include_router(auth_routes.router)
 
 # Define the tools
-tools = [query_fda_api]
+tools = [query_fda_api, query_pubmed_api, query_usda_food_data]
 
-# Attach the tools to the model so that it knows what it can call.
+# Attach the tools to the model
 llm_with_tools = llm.bind_tools(tools)
 
-# Create the graph with our tools and LLM
-graph_with_tools = create_graph(
-    llm_with_tools=llm_with_tools,
-    tools=tools,
-    system_prompt=DRUG_INTERACTION_BOT,
-    welcome_msg=WELCOME_MSG
-)
+# Create a function to get the graph with the personalized system prompt
+def get_graph_with_tools(user_info=None):
+    # If there is user information, personalize the system prompt
+    if user_info:
+        # Get the type and content of the original system prompt
+        system_type, system_content = DRUG_INTERACTION_BOT
+        
+        # Prepare the basic user information
+        user_info_text = f"The user is authentified. Their name is {user_info['first_name']} {user_info['last_name']}."
+        
+        # Add medication information if available
+        if 'medications' in user_info and user_info['medications']:
+            medications_text = "\n\nThe user takes the following medications:\n"
+            for med in user_info['medications']:
+                medications_text += f"- {med['name']}: {med['dosage']}, {med['frequency']}\n"
+            user_info_text += medications_text
+        
+        # Add the chronic conditions if available
+        if 'chronic_conditions' in user_info and user_info['chronic_conditions']:
+            user_info_text += f"\n\nThe user has the following chronic conditions:\n{user_info['chronic_conditions']}"
+        
+        # Add personalized information to system prompt
+        personalized_content = f"{user_info_text}\n\n{system_content}"
+        
+        # Create the personalized system prompt
+        personalized_system_prompt = (system_type, personalized_content)
+        
+        # Create the graph with the personalized system prompt
+        return create_api_graph(
+            llm_with_tools=llm_with_tools,
+            tools=tools,
+            system_prompt=personalized_system_prompt,
+            welcome_msg=WELCOME_MSG
+        )
+    else:
+        # Create the graph with the original system prompt
+        return create_api_graph(
+            llm_with_tools=llm_with_tools,
+            tools=tools,
+            system_prompt=DRUG_INTERACTION_BOT,
+            welcome_msg=WELCOME_MSG
+        )
 
-# Main function to run the application
-if __name__ == "__main__":
+# Create the initial graph with the original system prompt
+graph_with_tools = get_graph_with_tools()
+
+# Store conversations by ID
+conversations: Dict[str, ApiState] = {}
+
+# Get welcome message
+@app.get("/welcome")
+async def get_welcome_message():
+    return {"welcome_message": WELCOME_MSG.strip()}
+
+@app.post("/chat", response_model=BotResponse)
+async def chat(request: PromptRequest, current_user: schemas.User = Depends(get_current_user_optional)):
+    # Generate a new conversation ID if not provided
+    conversation_id = request.conversation_id or str(uuid.uuid4())
+    # Get or initialize conversation state
+    if conversation_id not in conversations:
+        # Initialize with welcome message
+        state = graph_with_tools.invoke({"messages": []})
+        conversations[conversation_id] = state
+    else:
+        state = conversations[conversation_id]
+    
     try:
-        print("Starting Drugsy...")
+        # Use the original user prompt without modification
+        user_prompt = request.prompt
         
-        # Run the graph with an empty initial state
-        state = graph_with_tools.invoke({"messages": []}, config={"recursion_limit": 10})
-        
-        # Main interaction loop
-        while not state.get("finished", False):
-            # The human_node will display the bot's message and get user input
-            state = graph_with_tools.invoke(state, config={"recursion_limit": 10})
+        # If the user is authenticated, prepare user info once for all conditions
+        user_graph = graph_with_tools  # Default to original graph
+        if current_user:
+            # Prepare the complete user information for the personalized graph
+            user_info = {
+                'first_name': current_user.first_name,
+                'last_name': current_user.last_name,
+                'medications': current_user.medications,
+                'chronic_conditions': current_user.chronic_conditions
+            }
             
-    except KeyboardInterrupt:
-        print("\nGoodbye!")
+            # Create a personalized graph with all user information
+            user_graph = get_graph_with_tools(user_info)
+            
+            # If it's a new conversation, initialize the state with the personalized graph
+            if conversation_id not in conversations:
+                state = user_graph.invoke({"messages": []})
+                conversations[conversation_id] = state
+        
+        # Process the message with the appropriate graph
+        if current_user:
+            # Use the personalized graph to process the message
+            result_state = process_message(user_graph, state, user_prompt)
+        else:
+            # Use the original graph to process the message
+            result_state = process_message(graph_with_tools, state, user_prompt)
+        
+        # Store the updated state
+        conversations[conversation_id] = result_state
+        
+        # Get the bot's response (last message)
+        bot_response = result_state["messages"][-1].content
+        
+        return BotResponse(
+            response=bot_response,
+            conversation_id=conversation_id
+        )
     except Exception as e:
-        print(f"An error occurred: {e}")
+        raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
+
+@app.get("/conversations/{conversation_id}", response_model=Dict[str, Any])
+async def get_conversation(conversation_id: str, current_user: schemas.User = Depends(get_current_active_user)):
+    if conversation_id not in conversations:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    # Convert the conversation state to a serializable format
+    state = conversations[conversation_id]
+    messages = []
+    
+    for msg in state.get("messages", []):
+        if isinstance(msg, HumanMessage):
+            messages.append({"role": "user", "content": msg.content})
+        elif isinstance(msg, AIMessage):
+            messages.append({"role": "assistant", "content": msg.content})
+        elif isinstance(msg, SystemMessage):
+            messages.append({"role": "system", "content": msg.content})
+    
+    return {
+        "conversation_id": conversation_id,
+        "messages": messages,
+        "finished": state.get("finished", False)
+    }
+
+if __name__ == "__main__":
+    uvicorn.run("api:app", host="0.0.0.0", port=port, reload=True)
