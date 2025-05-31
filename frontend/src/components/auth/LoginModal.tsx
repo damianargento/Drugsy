@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import './Auth.css';
+import { BACKEND_URL } from '../../config';
 
 interface LoginModalProps {
   onClose: () => void;
@@ -26,7 +27,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose, onLogin, onRegisterCli
       formData.append('username', email); // FastAPI OAuth2 expects 'username' field
       formData.append('password', password);
       
-      const tokenResponse = await axios.post('http://localhost:9000/token', formData, {
+      const tokenResponse = await axios.post(`${BACKEND_URL}/token`, formData, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
@@ -35,7 +36,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose, onLogin, onRegisterCli
       const token = tokenResponse.data.access_token;
 
       // Then, get the user info using the token
-      const userResponse = await axios.get('http://localhost:9000/users/me', {
+      const userResponse = await axios.get(`${BACKEND_URL}/users/me`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { UserInfo } from '../../services/authService';
+import { BACKEND_URL } from '../../config';
 import './Auth.css';
 
 // Usamos la interfaz UserInfo importada del servicio de autenticación
@@ -69,7 +70,7 @@ const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
 
     try {
       const response = await axios.put(
-        'http://localhost:9000/users/me',
+        `${BACKEND_URL}/users/me`,
         {
           first_name: firstName,
           last_name: lastName,

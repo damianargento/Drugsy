@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { UserInfo } from '../../services/authService';
+import { BACKEND_URL } from '../../config';
 import './Auth.css';
 
 interface RegisterModalProps {
@@ -87,7 +88,7 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ onClose, onRegister, onLo
 
     try {
       // Register the user with all information
-      const registerResponse = await axios.post('http://localhost:9000/register', {
+      const registerResponse = await axios.post(`${BACKEND_URL}/register`, {
         first_name: firstName,
         last_name: lastName,
         email: email,
@@ -102,7 +103,7 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ onClose, onRegister, onLo
       formData.append('username', email);
       formData.append('password', password);
       
-      const tokenResponse = await axios.post('http://localhost:9000/token', formData, {
+      const tokenResponse = await axios.post(`${BACKEND_URL}/token`, formData, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
         }

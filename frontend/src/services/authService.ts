@@ -1,6 +1,5 @@
 import axios from 'axios';
-
-const API_URL = 'http://localhost:9000';
+import { BACKEND_URL } from '../config';
 
 // Save token to local storage
 const setToken = (token: string) => {
@@ -64,7 +63,7 @@ const initAuthHeader = () => {
 
 // Login user
 const login = async (email: string, password: string) => {
-  const response = await axios.post(`${API_URL}/token`, {
+  const response = await axios.post(`${BACKEND_URL}/token`, {
     username: email,
     password: password,
   });
@@ -74,7 +73,7 @@ const login = async (email: string, password: string) => {
   setAuthHeader(token);
   
   // Get user info
-  const userResponse = await axios.get(`${API_URL}/users/me`);
+  const userResponse = await axios.get(`${BACKEND_URL}/users/me`);
   setUserInfo(userResponse.data);
   
   return {
@@ -90,7 +89,7 @@ const register = async (userData: {
   email: string;
   password: string;
 }) => {
-  const response = await axios.post(`${API_URL}/register`, userData);
+  const response = await axios.post(`${BACKEND_URL}/register`, userData);
   return response.data;
 };
 
@@ -108,7 +107,7 @@ const isAuthenticated = (): boolean => {
 
 // Actualizar información del usuario
 const updateUserSettings = async (userData: Partial<UserInfo>, token: string) => {
-  const response = await axios.put(`${API_URL}/users/me`, userData, {
+  const response = await axios.put(`${BACKEND_URL}/users/me`, userData, {
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'

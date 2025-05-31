@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
+import { BACKEND_URL } from './config';
 import './App.css';
 import './Chat.css';
 import AuthButton from './components/auth/AuthButton';
@@ -74,8 +75,8 @@ function App() {
       // Obtenemos el token
       const token = authService.getToken();
       
-      // Send message directly to the API
-      const response = await axios.post('http://localhost:9000/chat', {
+      // Send message to the backend API using the config URL
+      const response = await axios.post(`${BACKEND_URL}/chat`, {
         prompt: input,
         conversation_id: conversationId,
       }, {
@@ -119,7 +120,7 @@ function App() {
   useEffect(() => {
     const getWelcomeMessage = async () => {
       try {
-        const response = await axios.get('http://localhost:9000/welcome', {
+        const response = await axios.get(`${BACKEND_URL}/welcome`, {
           headers: {
             'Authorization': isLoggedIn ? `Bearer ${authService.getToken()}` : undefined,
           }
