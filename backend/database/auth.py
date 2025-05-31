@@ -60,7 +60,6 @@ def get_current_active_user(current_user: User = Depends(get_current_user)):
     return current_user
 
 async def get_current_user_optional(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    print(f"Token recibido: {token}")
     if token is None:
         return None
     try:

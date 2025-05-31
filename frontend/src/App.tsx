@@ -51,8 +51,6 @@ function App() {
     // Actualizar el estado local
     setIsLoggedIn(true);
     setUserInfo(userInfo);
-    
-    console.log('Token guardado:', token);
   };
 
   // Handle logout
