@@ -22,39 +22,11 @@ const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
   const [firstName, setFirstName] = useState(userInfo.first_name || '');
   const [lastName, setLastName] = useState(userInfo.last_name || '');
   const [email, setEmail] = useState(userInfo.email || '');
-  const [medications, setMedications] = useState<Array<{
-    name: string;
-    dosage: string;
-    frequency: string;
-  }>>(
-    userInfo.medications || [{ name: '', dosage: '', frequency: '' }]
-  );
-  const [chronicConditions, setChronicConditions] = useState(userInfo.chronic_conditions || '');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Agregar una nueva medicación vacía
-  const addMedication = () => {
-    setMedications([...medications, { name: '', dosage: '', frequency: '' }]);
-  };
-
-  // Eliminar una medicación por índice
-  const removeMedication = (index: number) => {
-    const updatedMedications = [...medications];
-    updatedMedications.splice(index, 1);
-    setMedications(updatedMedications);
-  };
-
-  // Actualizar un campo de medicación
-  const updateMedication = (index: number, field: 'name' | 'dosage' | 'frequency', value: string) => {
-    const updatedMedications = [...medications];
-    updatedMedications[index] = {
-      ...updatedMedications[index],
-      [field]: value
-    };
-    setMedications(updatedMedications);
-  };
+  // No medication or chronic conditions management needed anymore
 
   // Enviar el formulario
   const handleSubmit = async (e: React.FormEvent) => {
@@ -63,20 +35,13 @@ const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
     setSuccessMessage('');
     setIsLoading(true);
 
-    // Filtrar medicaciones vacías
-    const filteredMedications = medications.filter(
-      med => med.name.trim() !== '' || med.dosage.trim() !== '' || med.frequency.trim() !== ''
-    );
-
     try {
       const response = await axios.put(
         `${BACKEND_URL}/users/me`,
         {
           first_name: firstName,
           last_name: lastName,
-          email,
-          medications: filteredMedications.length > 0 ? filteredMedications : null,
-          chronic_conditions: chronicConditions.trim() !== '' ? chronicConditions : null
+          email
         },
         {
           headers: {
@@ -152,59 +117,7 @@ const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
             />
           </div>
           
-          <div className="form-group">
-            <label>Medications</label>
-            {medications.map((medication, index) => (
-              <div key={index} className="medication-row">
-                <div className="medication-fields">
-                  <input
-                    type="text"
-                    placeholder="Medication name"
-                    value={medication.name}
-                    onChange={(e) => updateMedication(index, 'name', e.target.value)}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Dosage"
-                    value={medication.dosage}
-                    onChange={(e) => updateMedication(index, 'dosage', e.target.value)}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Frequency"
-                    value={medication.frequency}
-                    onChange={(e) => updateMedication(index, 'frequency', e.target.value)}
-                  />
-                </div>
-                {medications.length > 1 && (
-                  <button
-                    type="button"
-                    className="remove-button"
-                    onClick={() => removeMedication(index)}
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            ))}
-            <button
-              type="button"
-              className="add-button"
-              onClick={addMedication}
-            >
-              + Add Medication
-            </button>
-          </div>
-          
-          <div className="form-group">
-            <label htmlFor="chronicConditions">Chronic Conditions</label>
-            <textarea
-              id="chronicConditions"
-              value={chronicConditions}
-              onChange={(e) => setChronicConditions(e.target.value)}
-              rows={4}
-            />
-          </div>
+          {/* Medications and chronic conditions fields removed */}
           
           <div className="button-group">
             <button

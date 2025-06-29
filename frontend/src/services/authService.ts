@@ -22,12 +22,6 @@ export interface UserInfo {
   email: string;
   first_name: string;
   last_name: string;
-  medications?: Array<{
-    name: string;
-    dosage: string;
-    frequency: string;
-  }>;
-  chronic_conditions?: string;
 }
 
 // Save user info to local storage

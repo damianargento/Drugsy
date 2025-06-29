@@ -3,24 +3,16 @@ import LoginModal from './LoginModal';
 import RegisterModal from './RegisterModal';
 import UserMenu from './UserMenu';
 import UserSettingsModal from './UserSettingsModal';
+import { useAuth } from '../../contexts/AuthContext';
 import { UserInfo } from '../../services/authService';
 import './Auth.css';
 
 // Usar la interfaz UserInfo importada del servicio de autenticación
 
-interface AuthButtonProps {
-  isLoggedIn: boolean;
-  userInfo: UserInfo | null;
-  onLogin: (token: string, userInfo: UserInfo) => void;
-  onLogout: () => void;
-}
+// No longer need props as we're using context
 
-const AuthButton: React.FC<AuthButtonProps> = ({ 
-  isLoggedIn, 
-  userInfo, 
-  onLogin, 
-  onLogout 
-}) => {
+const AuthButton: React.FC = () => {
+  const { isLoggedIn, userInfo, login, logout } = useAuth();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -34,7 +26,7 @@ const AuthButton: React.FC<AuthButtonProps> = ({
   };
 
   const handleLogout = () => {
-    onLogout();
+    logout();
   };
 
   const handleSettingsClick = () => {
@@ -42,8 +34,8 @@ const AuthButton: React.FC<AuthButtonProps> = ({
   };
 
   const handleUpdateSuccess = (updatedUserInfo: UserInfo) => {
-    // Actualizar la información del usuario en el estado global
-    onLogin(localStorage.getItem('token') || '', updatedUserInfo);
+    // Update user info in global state
+    login(localStorage.getItem('token') || '', updatedUserInfo);
   };
 
   return (
@@ -72,7 +64,7 @@ const AuthButton: React.FC<AuthButtonProps> = ({
       {showLoginModal && (
         <LoginModal
           onClose={() => setShowLoginModal(false)}
-          onLogin={onLogin}
+          onLogin={login}
           onRegisterClick={() => {
             setShowLoginModal(false);
             setShowRegisterModal(true);
@@ -84,7 +76,7 @@ const AuthButton: React.FC<AuthButtonProps> = ({
         <RegisterModal
           onClose={() => setShowRegisterModal(false)}
           onRegister={(token: string, userInfo: any) => {
-            onLogin(token, userInfo);
+            login(token, userInfo);
             setShowRegisterModal(false);
           }}
           onLoginClick={() => {

@@ -5,7 +5,9 @@ import { BACKEND_URL } from './config';
 import './App.css';
 import './Chat.css';
 import AuthButton from './components/auth/AuthButton';
-import authService from './services/authService';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import PatientManagement from './components/patients/PatientManagement';
+import { Patient } from './services/patientService';
 
 // Message type definition
 interface Message {
@@ -13,13 +15,13 @@ interface Message {
   content: string;
 }
 
-function App() {
+function AppContent() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userInfo, setUserInfo] = useState<any>(null);
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const { isLoggedIn, userInfo } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Scroll to bottom of messages
@@ -31,35 +33,6 @@ function App() {
     scrollToBottom();
   }, [messages]);
 
-  // Initialize authentication state from local storage
-  useEffect(() => {
-    authService.initAuthHeader();
-    const token = authService.getToken();
-    const storedUserInfo = authService.getUserInfo();
-    
-    if (token && storedUserInfo) {
-      setIsLoggedIn(true);
-      setUserInfo(storedUserInfo);
-    }
-  }, []);
-
-  // Handle login
-  const handleLogin = (token: string, userInfo: any) => {
-    // Guardar el token y la información del usuario en localStorage
-    authService.setToken(token);
-    authService.setUserInfo(userInfo);
-    
-    // Actualizar el estado local
-    setIsLoggedIn(true);
-    setUserInfo(userInfo);
-  };
-
-  // Handle logout
-  const handleLogout = () => {
-    authService.logout();
-    setIsLoggedIn(false);
-    setUserInfo(null);
-  };
 
   // Handle sending a message
   const handleSendMessage = async () => {
@@ -72,13 +45,14 @@ function App() {
     setIsLoading(true);
 
     try {
-      // Obtenemos el token
-      const token = authService.getToken();
+      // Get token from localStorage
+      const token = localStorage.getItem('token');
       
       // Send message to the backend API using the config URL
       const response = await axios.post(`${BACKEND_URL}/chat`, {
         prompt: input,
         conversation_id: conversationId,
+        patient_id: selectedPatient?.id || null,
       }, {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
@@ -122,7 +96,7 @@ function App() {
       try {
         const response = await axios.get(`${BACKEND_URL}/welcome`, {
           headers: {
-            'Authorization': isLoggedIn ? `Bearer ${authService.getToken()}` : undefined,
+            'Authorization': isLoggedIn ? `Bearer ${localStorage.getItem('token')}` : undefined,
           }
         });
         setMessages([
@@ -146,17 +120,26 @@ function App() {
     getWelcomeMessage();
   }, []);
 
+  const handlePatientSelect = (patient: Patient | null) => {
+    setSelectedPatient(patient);
+    // You could add additional logic here, such as loading patient-specific chat history
+  };
+
   return (
     <div className="chat-container">
       <header className="header">
         <img src="/images/logo.png" alt="Drugsy Logo" className="logo" />
-        <AuthButton 
-          isLoggedIn={isLoggedIn}
-          userInfo={userInfo}
-          onLogin={handleLogin}
-          onLogout={handleLogout}
-        />
+        <AuthButton />
       </header>
+      
+      {isLoggedIn && (
+        <div className="patient-section">
+          <PatientManagement 
+            onPatientSelect={handlePatientSelect}
+            selectedPatientId={selectedPatient?.id}
+          />
+        </div>
+      )}
       <div className="messages-container">
         {messages.map((message, index) => (
           <div 
@@ -202,6 +185,15 @@ function App() {
         </button>
       </div>
     </div>
+  );
+}
+
+// Wrap the app with AuthProvider
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

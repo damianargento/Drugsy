@@ -19,6 +19,7 @@ from database import Base, engine
 from database.auth import get_current_active_user, get_current_user_optional
 from database import schemas
 from routes import auth as auth_routes
+from routes import patients as patients_routes
 
 dotenv.load_dotenv()
 
@@ -42,6 +43,9 @@ if os.getenv("DEV_MODE") == "True":
 # Include authentication routes
 app.include_router(auth_routes.router)
 
+# Include patient routes
+app.include_router(patients_routes.router)
+
 # Define the tools
 tools = [query_fda_api, query_pubmed_api, query_usda_food_data]
 
@@ -49,25 +53,31 @@ tools = [query_fda_api, query_pubmed_api, query_usda_food_data]
 llm_with_tools = llm.bind_tools(tools)
 
 # Create a function to get the graph with the personalized system prompt
-def get_graph_with_tools(user_info=None):
+def get_graph_with_tools(user_info=None, patient_info=None):
     # If there is user information, personalize the system prompt
     if user_info:
         # Get the type and content of the original system prompt
         system_type, system_content = DRUG_INTERACTION_BOT
         
         # Prepare the basic user information
-        user_info_text = f"The user is authentified. Their name is {user_info['first_name']} {user_info['last_name']}."
-        
-        # Add medication information if available
-        if 'medications' in user_info and user_info['medications']:
-            medications_text = "\n\nThe user takes the following medications:\n"
-            for med in user_info['medications']:
-                medications_text += f"- {med['name']}: {med['dosage']}, {med['frequency']}\n"
-            user_info_text += medications_text
-        
-        # Add the chronic conditions if available
-        if 'chronic_conditions' in user_info and user_info['chronic_conditions']:
-            user_info_text += f"\n\nThe user has the following chronic conditions:\n{user_info['chronic_conditions']}"
+        user_info_text = f"You are assisting Dr. {user_info['first_name']} {user_info['last_name']}."
+        print(patient_info)
+        # Add patient information if available
+        if patient_info:
+            user_info_text += f"\n\nYou are currently reviewing patient: {patient_info['first_name']} {patient_info['last_name']}"
+            
+            # Add patient medication information if available
+            if 'medications' in patient_info and patient_info['medications']:
+                medications_text = "\n\nThe patient takes the following medications:\n"
+                for med in patient_info['medications']:
+                    medications_text += f"- {med['name']}: {med['dosage']}, {med['frequency']}\n"
+                user_info_text += medications_text
+            
+            # Add the patient chronic conditions if available
+            if 'chronic_conditions' in patient_info and patient_info['chronic_conditions']:
+                user_info_text += f"\n\nThe patient has the following chronic conditions:\n{patient_info['chronic_conditions']}"
+                
+            user_info_text += "\n\nYou should provide medical advice and information based on this patient's data."
         
         # Add personalized information to system prompt
         personalized_content = f"{user_info_text}\n\n{system_content}"
@@ -121,16 +131,31 @@ async def chat(request: PromptRequest, current_user: schemas.User = Depends(get_
         # If the user is authenticated, prepare user info once for all conditions
         user_graph = graph_with_tools  # Default to original graph
         if current_user:
-            # Prepare the complete user information for the personalized graph
+            # Prepare the basic user information for the personalized graph
             user_info = {
                 'first_name': current_user.first_name,
                 'last_name': current_user.last_name,
-                'medications': current_user.medications,
-                'chronic_conditions': current_user.chronic_conditions
             }
+            print(request)
+            # Get patient info if patient_id is provided in the request
+            patient_info = None
+            if request.patient_id:
+                # Import here to avoid circular imports
+                from database.crud import get_patient_by_id
+                from database.database import get_db
+                db = next(get_db())
+                patient = get_patient_by_id(db, request.patient_id, current_user.id)
+                print(patient)
+                if patient:
+                    patient_info = {
+                        'first_name': patient.first_name,
+                        'last_name': patient.last_name,
+                        'medications': patient.medications,
+                        'chronic_conditions': patient.chronic_conditions
+                    }
             
-            # Create a personalized graph with all user information
-            user_graph = get_graph_with_tools(user_info)
+            # Create a personalized graph with user and patient information
+            user_graph = get_graph_with_tools(user_info, patient_info)
             
             # If it's a new conversation, initialize the state with the personalized graph
             if conversation_id not in conversations:
@@ -182,4 +207,4 @@ async def get_conversation(conversation_id: str, current_user: schemas.User = De
     }
 
 if __name__ == "__main__":
-    uvicorn.run("api:app", host="0.0.0.0", port=port, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
