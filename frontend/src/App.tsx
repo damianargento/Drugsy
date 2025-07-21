@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
+import axios from 'axios';
 import { BACKEND_URL } from './config';
 import './App.css';
 import './Chat.css';
-import AuthButton from './components/auth/AuthButton';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import PatientManagement from './components/patients/PatientManagement';
+import { PatientProvider, usePatient } from './contexts/PatientContext';
 import { Patient } from './services/patientService';
+import Sidebar from './components/sidebar/Sidebar';
+import AuthButton from './components/auth/AuthButton';
 
 // Message type definition
 interface Message {
@@ -20,8 +21,8 @@ function AppContent() {
   const [input, setInput] = useState('');
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const { isLoggedIn, userInfo } = useAuth();
+  const { selectedPatient } = usePatient();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Scroll to bottom of messages
@@ -32,6 +33,16 @@ function AppContent() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Add welcome message when component mounts
+  useEffect(() => {
+    setMessages([
+      {
+        role: 'assistant',
+        content: "Hello! I'm Drugsy! I'm here to help doctors manage their patients' medications and provide information about drug interactions, side effects, and dietary recommendations. If you select a patient, I will provide personalized advice based on their medications and chronic conditions."
+      }
+    ]);
+  }, []);
 
 
   // Handle sending a message
@@ -45,31 +56,20 @@ function AppContent() {
     setIsLoading(true);
 
     try {
-      // Get token from localStorage
-      const token = localStorage.getItem('token');
-      
       // Send message to the backend API using the config URL
+      // Axios will automatically use the Authorization header set by our interceptors
       const response = await axios.post(`${BACKEND_URL}/chat`, {
         prompt: input,
         conversation_id: conversationId,
-        patient_id: selectedPatient?.id || null,
-      }, {
-        headers: {
-          'Authorization': token ? `Bearer ${token}` : '',
-        }
+        patient_id: selectedPatient?.id
       });
-
-      // Save the conversation ID for future messages
-      if (!conversationId) {
-        setConversationId(response.data.conversation_id);
-      }
 
       // Add assistant response to the chat
       const assistantMessage: Message = {
         role: 'assistant',
         content: response.data.response,
       };
-      setMessages(prev => [...prev, assistantMessage]);
+      setMessages(prevMessages => [...prevMessages, assistantMessage]);
     } catch (error) {
       console.error('Error sending message:', error);
       // Add error message
@@ -77,7 +77,7 @@ function AppContent() {
         role: 'assistant',
         content: 'Sorry, there was an error processing your request. Please try again.',
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prevMessages => [...prevMessages, errorMessage]);
     } finally {
       setIsLoading(false);
     }
@@ -90,56 +90,15 @@ function AppContent() {
     }
   };
 
-  // Get welcome message from backend when component mounts
-  useEffect(() => {
-    const getWelcomeMessage = async () => {
-      try {
-        const response = await axios.get(`${BACKEND_URL}/welcome`, {
-          headers: {
-            'Authorization': isLoggedIn ? `Bearer ${localStorage.getItem('token')}` : undefined,
-          }
-        });
-        setMessages([
-          {
-            role: 'assistant',
-            content: response.data.welcome_message,
-          },
-        ]);
-      } catch (error) {
-        console.error('Error fetching welcome message:', error);
-        // Fallback welcome message if API call fails
-        setMessages([
-          {
-            role: 'assistant',
-            content: 'Hello! Welcome to Drugsy. How can I help you today?',
-          },
-        ]);
-      }
-    };
-    
-    getWelcomeMessage();
-  }, []);
-
-  const handlePatientSelect = (patient: Patient | null) => {
-    setSelectedPatient(patient);
-    // You could add additional logic here, such as loading patient-specific chat history
-  };
-
   return (
-    <div className="chat-container">
+    <>
       <header className="header">
         <img src="/images/logo.png" alt="Drugsy Logo" className="logo" />
         <AuthButton />
       </header>
-      
-      {isLoggedIn && (
-        <div className="patient-section">
-          <PatientManagement 
-            onPatientSelect={handlePatientSelect}
-            selectedPatientId={selectedPatient?.id}
-          />
-        </div>
-      )}
+      <main className="main">
+      {isLoggedIn && <Sidebar /> }
+      <div className="chat-container">
       <div className="messages-container">
         {messages.map((message, index) => (
           <div 
@@ -185,14 +144,18 @@ function AppContent() {
         </button>
       </div>
     </div>
+    </main>
+    </>
   );
 }
 
-// Wrap the app with AuthProvider
+// Wrap the app with AuthProvider and PatientProvider
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <PatientProvider>
+        <AppContent />
+      </PatientProvider>
     </AuthProvider>
   );
 }

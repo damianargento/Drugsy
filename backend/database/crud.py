@@ -2,7 +2,8 @@ from sqlalchemy.orm import Session
 from . import models, schemas
 from fastapi import HTTPException, status
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timedelta
+import secrets
 
 def get_user_by_email(db: Session, email: str):
     return db.query(models.User).filter(models.User.email == email).first()
@@ -64,6 +65,75 @@ def update_user(db: Session, user_id: int, user_data: schemas.UserUpdate):
     db.commit()
     db.refresh(db_user)
     return db_user
+
+def delete_user(db: Session, user_id: int):
+    db_user = get_user_by_id(db, user_id)
+    if not db_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Delete all patients associated with this user
+    patients = get_patients_by_doctor(db, user_id)
+    for patient in patients:
+        db.delete(patient)
+    
+    # Delete the user
+    db.delete(db_user)
+    db.commit()
+    return {"message": "User account and all associated data deleted successfully"}
+
+
+def create_password_reset_token(db: Session, email: str) -> Optional[str]:
+    """Create a password reset token for a user"""
+    # Find the user by email
+    user = get_user_by_email(db, email)
+    if not user:
+        return None
+    
+    # Generate a secure token
+    token = secrets.token_urlsafe(32)
+    
+    # Set token expiration (24 hours)
+    expiration = datetime.now() + timedelta(hours=24)
+    
+    # Save token to user record
+    user.reset_token = token
+    user.reset_token_expires = expiration
+    db.commit()
+    
+    return token
+
+
+def verify_reset_token(db: Session, token: str) -> Optional[models.User]:
+    """Verify a password reset token and return the user if valid"""
+    # Find user with this token
+    user = db.query(models.User).filter(models.User.reset_token == token).first()
+    
+    # Check if token exists and is not expired
+    if not user or not user.reset_token_expires or user.reset_token_expires < datetime.now():
+        return None
+    
+    return user
+
+
+def reset_password(db: Session, token: str, new_password: str) -> bool:
+    """Reset a user's password using a valid token"""
+    # Verify token and get user
+    user = verify_reset_token(db, token)
+    if not user:
+        return False
+    
+    # Update password
+    user.hashed_password = models.User.get_password_hash(new_password)
+    
+    # Clear reset token
+    user.reset_token = None
+    user.reset_token_expires = None
+    
+    db.commit()
+    return True
 
 # Patient CRUD operations
 def get_patients_by_doctor(db: Session, doctor_id: int) -> List[models.Patient]:

@@ -19,6 +19,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ onPatientAdded, onCancel, pat
   );
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
 
   const handleAddMedication = () => {
     setMedications([...medications, { name: '', dosage: '', frequency: '' }]);
@@ -71,6 +72,30 @@ const PatientForm: React.FC<PatientFormProps> = ({ onPatientAdded, onCancel, pat
     } finally {
       setLoading(false);
     }
+  };
+  
+  const handleDeleteClick = () => {
+    setShowDeleteConfirm(true);
+  };
+  
+  const handleDeleteConfirm = async () => {
+    if (!patient?.id) return;
+    
+    try {
+      setLoading(true);
+      await patientService.deletePatient(patient.id);
+      onPatientAdded(); // This will refresh the patient list
+    } catch (err) {
+      console.error('Error deleting patient:', err);
+      setError('Failed to delete patient. Please try again.');
+    } finally {
+      setLoading(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+  
+  const handleDeleteCancel = () => {
+    setShowDeleteConfirm(false);
   };
 
   return (
@@ -168,13 +193,55 @@ const PatientForm: React.FC<PatientFormProps> = ({ onPatientAdded, onCancel, pat
         </div>
         
         <div className="form-actions">
-          <button type="button" onClick={onCancel} className="cancel-btn">
-            Cancel
-          </button>
-          <button type="submit" className="submit-btn" disabled={loading}>
-            {loading ? 'Saving...' : isEdit ? 'Update Patient' : 'Save Patient'}
-          </button>
+          <div className="form-actions-left">
+            {isEdit && (
+              <button 
+                type="button" 
+                onClick={handleDeleteClick} 
+                className="delete-btn"
+                disabled={loading}
+              >
+                Delete Patient
+              </button>
+            )}
+          </div>
+          <div className="form-actions-right">
+            <button type="button" onClick={onCancel} className="cancel-btn">
+              Cancel
+            </button>
+            <button type="submit" className="submit-btn" disabled={loading}>
+              {loading ? 'Saving...' : isEdit ? 'Update Patient' : 'Save Patient'}
+            </button>
+          </div>
         </div>
+        
+        {showDeleteConfirm && (
+          <div className="delete-confirmation-modal">
+            <div className="delete-confirmation-content">
+              <h3>Delete Patient</h3>
+              <p>Are you sure you want to delete {firstName} {lastName}?</p>
+              <p>This action cannot be undone.</p>
+              <div className="delete-confirmation-actions">
+                <button 
+                  type="button" 
+                  onClick={handleDeleteCancel} 
+                  className="cancel-delete-btn"
+                  disabled={loading}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button" 
+                  onClick={handleDeleteConfirm} 
+                  className="confirm-delete-btn"
+                  disabled={loading}
+                >
+                  {loading ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </form>
     </div>
   );

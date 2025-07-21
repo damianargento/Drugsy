@@ -40,10 +40,7 @@ const PatientManagement: React.FC<PatientManagementProps> = ({ onPatientSelect, 
   return (
     <div className="patient-management">
       <div className="patient-management-header">
-        <div className="patient-management-title">Patient</div>
-        <button className="add-patient-btn" onClick={handleAddPatientClick}>
-          Add Patient
-        </button>
+        <div className="patient-management-title">Patients</div>
       </div>
       
       <PatientSelector 
@@ -52,6 +49,10 @@ const PatientManagement: React.FC<PatientManagementProps> = ({ onPatientSelect, 
         selectedPatientId={selectedPatientId}
         onEditPatient={handleEditPatientClick}
       />
+      
+      <button className="add-patient-btn sidebar-add-btn" onClick={handleAddPatientClick}>
+        Add Patient
+      </button>
       
       {showPatientModal && (
         <div className="modal-overlay">

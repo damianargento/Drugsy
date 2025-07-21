@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { UserInfo } from '../../services/authService';
 import { BACKEND_URL } from '../../config';
+import DeleteAccountModal from './DeleteAccountModal';
 import './Auth.css';
 
 // Usamos la interfaz UserInfo importada del servicio de autenticación
@@ -25,6 +26,7 @@ const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   // No medication or chronic conditions management needed anymore
 
@@ -137,6 +139,24 @@ const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
             </button>
           </div>
         </form>
+        
+        <div className="danger-zone">
+          <h3>Danger Zone</h3>
+          <p>Permanently delete your account and all associated data</p>
+          <button 
+            className="delete-account-btn"
+            onClick={() => setShowDeleteModal(true)}
+          >
+            Delete Account
+          </button>
+        </div>
+        
+        {showDeleteModal && (
+          <DeleteAccountModal 
+            onClose={() => setShowDeleteModal(false)}
+            onDeleteSuccess={onClose}
+          />
+        )}
       </div>
     </div>
   );

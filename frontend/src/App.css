@@ -7,8 +7,20 @@
   padding: 1rem;
   background-color: #141c20;
   color: white;
-  border-radius: 30px;
   border-bottom: 1px solid #1A202C;
+  width: 100%;
+  height: 64px;
+  box-sizing: border-box;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.main {
+  display: flex;
+  flex-direction: row;
+  height: calc(100vh - 64px);
+  overflow: hidden;
 }
 
 .patient-section {
@@ -18,7 +30,19 @@
 }
 
 .logo {
-    width:200px;
-    margin-top:-15px;
+    width:150px;
+    margin-top:-10px;
     margin-bottom:-15px;
+  }
+
+  .modal-content {
+    background-color: #1A202C;
+    border-radius: 0.5rem;
+    margin: 1rem;
+    padding: 1rem;
+    width: 100%;
+    max-width: 750px;
+    color: white;
+    max-height: 90vh;
+    overflow-y: auto;
   }

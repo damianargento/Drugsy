@@ -2,36 +2,61 @@
 .patient-selector {
   margin: 10px 0;
   position: relative;
+  width: 100%;
 }
 
 .patient-selector-container {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 5px;
+  width: 100%;
 }
 
-.patient-select {
+/* React Select Custom Styling */
+.patient-select-dropdown {
   flex: 1;
-  padding: 10px;
-  border: 1px solid #2D3748;
-  border-radius: 4px;
+  min-width: 0; /* Allows the select to shrink below its content width */
   font-size: 14px;
-  background-color: #1A202C;
-  color: white;
-  cursor: pointer;
+}
+
+/* Override some react-select default styles */
+.patient-select__control {
+  min-height: 36px !important;
+}
+
+.patient-select__value-container {
+  padding: 2px 8px !important;
+}
+
+.patient-select__menu {
+  margin-top: 4px !important;
+}
+
+.patient-select__option {
+  padding: 8px !important;
+  font-size: 14px !important;
+}
+
+.patient-select__single-value {
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: calc(100% - 8px) !important;
 }
 
 .edit-patient-btn {
   background-color: #2C5282;
   color: #BEE3F8;
   border: none;
-  padding: 8px 15px;
+  padding: 8px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 14px;
+  min-width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
-  gap: 5px;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .edit-patient-btn:hover {
@@ -183,9 +208,97 @@
 
 .form-actions {
   display: flex;
-  justify-content: flex-end;
-  gap: 10px;
+  justify-content: space-between;
   margin-top: 20px;
+}
+
+.form-actions-left {
+  display: flex;
+  gap: 10px;
+}
+
+.form-actions-right {
+  display: flex;
+  gap: 10px;
+}
+
+.delete-btn {
+  background-color: #E53E3E;
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.delete-btn:hover {
+  background-color: #C53030;
+}
+
+.delete-btn:disabled {
+  background-color: #FC8181;
+  cursor: not-allowed;
+}
+
+.delete-confirmation-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1100;
+}
+
+.delete-confirmation-content {
+  background-color: #1A202C;
+  border-radius: 8px;
+  padding: 20px;
+  width: 90%;
+  max-width: 400px;
+  color: white;
+  text-align: center;
+}
+
+.delete-confirmation-content h3 {
+  margin-top: 0;
+  color: #E53E3E;
+}
+
+.delete-confirmation-actions {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.cancel-delete-btn {
+  background-color: #2D3748;
+  color: #E2E8F0;
+  border: 1px solid #4A5568;
+  padding: 10px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.confirm-delete-btn {
+  background-color: #E53E3E;
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.confirm-delete-btn:disabled {
+  background-color: #FC8181;
+  cursor: not-allowed;
 }
 
 .cancel-btn {
@@ -237,7 +350,7 @@
 .patient-management-title {
   font-size: 18px;
   font-weight: 500;
-  color: #333;
+  color: #FFFFFF;
 }
 
 .add-patient-btn {
@@ -250,7 +363,14 @@
   font-size: 14px;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
+}
+
+.sidebar-add-btn {
+  width: 100%;
+  margin-top: 10px;
+  box-sizing: border-box;
 }
 
 .modal-overlay {
@@ -264,18 +384,6 @@
   justify-content: center;
   align-items: center;
   z-index: 1000;
-  padding: 20px;
-}
-
-.modal-content {
-  background-color: #1A202C;
-  border-radius: 8px;
-  width: 100%;
-  max-width: 500px;
-  max-height: 90vh;
-  overflow-y: auto;
-  position: relative;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 
 .close-modal-btn {

@@ -1,0 +1,48 @@
+.sidebar {
+  height: 90vh;
+  background-color: #141c20;
+  border-right: 1px solid #1A202C;
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+  color: white;
+  padding: 20px 10px;
+  transition: width 0.3s ease;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.sidebar.open {
+  width: 400px;
+}
+
+.sidebar.closed {
+  width: 60px;
+}
+
+.sidebar-auth {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.toggle-button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 28px;
+  cursor: pointer;
+  padding: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 5px;
+  transition: background-color 0.2s;
+}
+
+.toggle-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}

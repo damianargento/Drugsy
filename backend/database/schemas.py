@@ -2,6 +2,14 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime, date
 
+# Schema for password reset
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+class PasswordReset(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=8)
+
 # Schema for medication
 class Medication(BaseModel):
     name: str
@@ -47,10 +55,14 @@ class UserUpdate(BaseModel):
 # Token schemas
 class Token(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str
 
 class TokenData(BaseModel):
     email: Optional[str] = None
+    
+class TokenRefresh(BaseModel):
+    refresh_token: str
 
 # Base Patient Schema
 class PatientBase(BaseModel):

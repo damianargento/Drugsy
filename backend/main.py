@@ -4,6 +4,7 @@ from typing import Dict, Any
 import uuid
 from models.llm import llm
 from models.chat_models import PromptRequest, BotResponse
+from tools.patient_edit_tool import edit_patient_data, get_patient_data, add_medication, add_progress_note
 from tools.fda_api import query_fda_api
 from tools.pubmed_api import query_pubmed_api
 from tools.usda_api import query_usda_food_data
@@ -23,7 +24,7 @@ from routes import patients as patients_routes
 
 dotenv.load_dotenv()
 
-port = int(os.environ.get("PORT", 8080))
+port = int(os.environ.get("PORT"))
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -47,7 +48,7 @@ app.include_router(auth_routes.router)
 app.include_router(patients_routes.router)
 
 # Define the tools
-tools = [query_fda_api, query_pubmed_api, query_usda_food_data]
+tools = [query_fda_api, query_pubmed_api, query_usda_food_data, edit_patient_data, get_patient_data, add_medication, add_progress_note]
 
 # Attach the tools to the model
 llm_with_tools = llm.bind_tools(tools)
@@ -61,10 +62,10 @@ def get_graph_with_tools(user_info=None, patient_info=None):
         
         # Prepare the basic user information
         user_info_text = f"You are assisting Dr. {user_info['first_name']} {user_info['last_name']}."
-        print(patient_info)
         # Add patient information if available
         if patient_info:
-            user_info_text += f"\n\nYou are currently reviewing patient: {patient_info['first_name']} {patient_info['last_name']}"
+            user_info_text += f"\n\nYou are currently reviewing patient: {patient_info['first_name']} {patient_info['last_name']} (the ID of the patient is: {patient_info['id']})\n"
+            user_info_text += f"IMPORTANT: When using any patient-related tools, you MUST use the patient ID {patient_info['id']}. DO NOT make up an ID."
             
             # Add patient medication information if available
             if 'medications' in patient_info and patient_info['medications']:
@@ -77,7 +78,7 @@ def get_graph_with_tools(user_info=None, patient_info=None):
             if 'chronic_conditions' in patient_info and patient_info['chronic_conditions']:
                 user_info_text += f"\n\nThe patient has the following chronic conditions:\n{patient_info['chronic_conditions']}"
                 
-            user_info_text += "\n\nYou should provide medical advice and information based on this patient's data."
+            user_info_text += f"\n\nYou should provide medical advice and information based on this patient's data. Remember to ALWAYS use patient ID {patient_info['id']} when using any patient-related tools."
         
         # Add personalized information to system prompt
         personalized_content = f"{user_info_text}\n\n{system_content}"
@@ -117,6 +118,7 @@ async def chat(request: PromptRequest, current_user: schemas.User = Depends(get_
     # Generate a new conversation ID if not provided
     conversation_id = request.conversation_id or str(uuid.uuid4())
     # Get or initialize conversation state
+
     if conversation_id not in conversations:
         # Initialize with welcome message
         state = graph_with_tools.invoke({"messages": []})
@@ -136,7 +138,6 @@ async def chat(request: PromptRequest, current_user: schemas.User = Depends(get_
                 'first_name': current_user.first_name,
                 'last_name': current_user.last_name,
             }
-            print(request)
             # Get patient info if patient_id is provided in the request
             patient_info = None
             if request.patient_id:
@@ -145,15 +146,21 @@ async def chat(request: PromptRequest, current_user: schemas.User = Depends(get_
                 from database.database import get_db
                 db = next(get_db())
                 patient = get_patient_by_id(db, request.patient_id, current_user.id)
-                print(patient)
                 if patient:
                     patient_info = {
                         'first_name': patient.first_name,
                         'last_name': patient.last_name,
+                        'id': patient.id,
                         'medications': patient.medications,
                         'chronic_conditions': patient.chronic_conditions
                     }
-            
+                    print("\n==== PATIENT INFO ====")
+                    print(f"Patient ID: {patient_info['id']}")
+                    print(f"Name: {patient_info['first_name']} {patient_info['last_name']}")
+                    print(f"Chronic Conditions: {patient_info['chronic_conditions']}")
+                    print(f"Medications: {patient_info['medications']}")
+                    print("=====================\n")
+
             # Create a personalized graph with user and patient information
             user_graph = get_graph_with_tools(user_info, patient_info)
             
@@ -161,6 +168,9 @@ async def chat(request: PromptRequest, current_user: schemas.User = Depends(get_
             if conversation_id not in conversations:
                 state = user_graph.invoke({"messages": []})
                 conversations[conversation_id] = state
+        
+        # Print request information
+        print(f"\n==== REQUEST INFO ====\nPatient ID in request: {request.patient_id}\nPrompt: {user_prompt}\n=====================\n")
         
         # Process the message with the appropriate graph
         if current_user:

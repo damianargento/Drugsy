@@ -5,11 +5,12 @@ import { BACKEND_URL } from '../../config';
 
 interface LoginModalProps {
   onClose: () => void;
-  onLogin: (token: string, userInfo: any) => void;
+  onLogin: (token: string, refreshToken: string, userInfo: any) => void;
   onRegisterClick: () => void;
+  onForgotPasswordClick: () => void;
 }
 
-const LoginModal: React.FC<LoginModalProps> = ({ onClose, onLogin, onRegisterClick }) => {
+const LoginModal: React.FC<LoginModalProps> = ({ onClose, onLogin, onRegisterClick, onForgotPasswordClick }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -21,43 +22,59 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose, onLogin, onRegisterCli
     setIsLoading(true);
 
     try {
-      // First, get the token
-      // Usar URLSearchParams para enviar los datos en formato form-urlencoded
+      // First, get the token - use axios instance without global error handling
       const formData = new URLSearchParams();
       formData.append('username', email); // FastAPI OAuth2 expects 'username' field
       formData.append('password', password);
       
-      const tokenResponse = await axios.post(`${BACKEND_URL}/token`, formData, {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-      });
-
-      const token = tokenResponse.data.access_token;
-
-      // Then, get the user info using the token
-      const userResponse = await axios.get(`${BACKEND_URL}/users/me`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
+      // Create a new axios instance for this request to avoid global error handlers
+      const axiosInstance = axios.create();
+      
+      try {
+        const tokenResponse = await axiosInstance.post(`${BACKEND_URL}/token`, formData, {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          // Prevent axios from throwing for HTTP error status codes
+          validateStatus: () => true,
+        });
+        
+        // Check if the response was successful
+        if (tokenResponse.status !== 200) {
+          // Handle error response
+          const errorDetail = tokenResponse.data.detail || 'Authentication failed';
+          setError(typeof errorDetail === 'object' ? JSON.stringify(errorDetail) : String(errorDetail));
+          return; // Exit early without closing modal
         }
-      });
+        
+        const token = tokenResponse.data.access_token;
+        const refreshToken = tokenResponse.data.refresh_token;
 
-      // Call the onLogin callback with the token and user info
-      onLogin(token, userResponse.data);
-      onClose();
-    } catch (error: any) {
-      console.error('Login error:', error);
-      if (error.response && error.response.data && error.response.data.detail) {
-        // Convertir el detalle del error a string si es un objeto
-        const errorDetail = error.response.data.detail;
-        if (typeof errorDetail === 'object') {
-          setError(JSON.stringify(errorDetail));
-        } else {
-          setError(String(errorDetail));
+        // Then, get the user info using the token
+        const userResponse = await axiosInstance.get(`${BACKEND_URL}/users/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          validateStatus: () => true,
+        });
+        
+        if (userResponse.status !== 200) {
+          setError('Failed to get user information');
+          return; // Exit early without closing modal
         }
-      } else {
-        setError('Invalid email or password. Please try again.');
+
+        // Only call onLogin on successful authentication
+        onLogin(token, refreshToken, userResponse.data);
+        // Close the modal explicitly on success
+        onClose();
+      } catch (axiosError) {
+        // This will only catch network errors, not HTTP status errors
+        console.error('Network error during login:', axiosError);
+        setError('Network error. Please check your connection and try again.');
       }
+    } catch (error: any) {
+      console.error('Unexpected login error:', error);
+      setError('An unexpected error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -88,6 +105,11 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose, onLogin, onRegisterCli
               onChange={(e) => setPassword(e.target.value)}
               required
             />
+            <div className="forgot-password">
+              <button type="button" onClick={onForgotPasswordClick} className="text-button">
+                Forgot Password?
+              </button>
+            </div>
           </div>
           <div className="form-actions">
             <button type="button" onClick={onClose} className="cancel-button">

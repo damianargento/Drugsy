@@ -5,7 +5,7 @@ import authService, { UserInfo } from '../services/authService';
 interface AuthContextType {
   isLoggedIn: boolean;
   userInfo: UserInfo | null;
-  login: (token: string, userInfo: UserInfo) => void;
+  login: (token: string, refreshToken: string, userInfo: UserInfo) => void;
   logout: () => void;
 }
 
@@ -13,7 +13,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   isLoggedIn: false,
   userInfo: null,
-  login: () => {},
+  login: (_token, _refreshToken, _userInfo) => {},
   logout: () => {},
 });
 
@@ -29,22 +29,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
 
-  // Initialize authentication state from local storage
+  // Initialize authentication state from local storage with token verification
   useEffect(() => {
-    authService.initAuthHeader();
-    const token = authService.getToken();
-    const storedUserInfo = authService.getUserInfo();
+    const initAuth = async () => {
+      authService.initAuthHeader();
+      const token = authService.getToken();
+      const storedUserInfo = authService.getUserInfo();
+      
+      if (token && storedUserInfo) {
+        // Verify if token is valid or can be refreshed
+        const isValid = await authService.verifyTokenAndRefresh();
+        
+        if (isValid) {
+          // Token is valid or was successfully refreshed
+          setIsLoggedIn(true);
+          setUserInfo(storedUserInfo);
+        } else {
+          // Token is invalid and couldn't be refreshed
+          authService.logout();
+          setIsLoggedIn(false);
+          setUserInfo(null);
+        }
+      }
+    };
     
-    if (token && storedUserInfo) {
-      setIsLoggedIn(true);
-      setUserInfo(storedUserInfo);
-    }
+    initAuth();
   }, []);
 
   // Handle login
-  const login = (token: string, userInfo: UserInfo) => {
-    // Save token and user info in localStorage
+  const login = (token: string, refreshToken: string, userInfo: UserInfo) => {
+    // Save tokens and user info in localStorage
     authService.setToken(token);
+    authService.setRefreshToken(refreshToken);
     authService.setUserInfo(userInfo);
     
     // Update local state

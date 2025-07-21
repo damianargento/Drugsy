@@ -2,17 +2,11 @@
 .chat-container {
   display: flex;
   flex-direction: column;
-  height: 90vh;
   background-color: #141c20;
   color: white;
-  position: relative;
-  border-radius: 30px;
-}
-
-@media (min-width: 768px) {
-  .chat-container {
-    margin: 30px 200px;
-  }
+  width: 100%;
+  height: calc(100vh - 64px); /* Subtract header height */
+  overflow: hidden; /* Prevent overflow from container */
 }
 
 /* Header */
@@ -35,6 +29,8 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  height: calc(100% - 80px); /* Leave space for input container */
+  max-height: calc(100% - 80px);
 }
 
 /* Message styles */
@@ -178,6 +174,8 @@
   display: flex;
   padding: 1rem;
   border-top: 1px solid #2D3748;
+  min-height: 80px;
+  box-sizing: border-box;
 }
 
 .message-input {

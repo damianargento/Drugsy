@@ -74,7 +74,6 @@ def create_graph(llm_with_tools, tools, system_prompt, welcome_msg):
     def human_node(state: OrderState) -> OrderState:
         """Display the last model message to the user, and receive the user's input."""
         last_msg = state["messages"][-1]
-        print("Bot:", last_msg.content)
     
         user_input = input("User: ")
     
