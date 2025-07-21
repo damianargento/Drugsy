@@ -114,8 +114,14 @@ def send_password_reset_email(email: str, token: str):
     if not from_email:
         from_email = smtp_username
     
-    # Create reset URL (frontend URL)
-    reset_url = f"http://localhost:3000/reset-password?token={token}"
+    # Get frontend URL from environment variable with fallback for local development
+    frontend_url = os.getenv("FRONTEND_URL")
+
+    # Create reset URL
+    reset_url = f"{frontend_url}/reset-password?token={token}"
+    
+    # Log the reset URL (for debugging)
+    logger.info(f"Reset URL: {reset_url}")
     
     # Log email configuration (without password)
     logger.info(f"Email configuration: Server={smtp_server}, Port={smtp_port}, Username={smtp_username}, From={from_email}")
