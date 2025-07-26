@@ -40,6 +40,19 @@ if os.getenv("DEV_MODE") == "True":
         allow_methods=["*"],
         allow_headers=["*"],
     )
+else: 
+    # Configure CORS for production environment
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "https://drugsy.web.app",            # Production frontend
+            "https://drugsy.firebaseapp.com",    # Alternative production frontend URL
+            "https://drugsy-backend-750774374925.us-central1.run.app",  # Backend URL (for API docs)
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 # Include authentication routes
 app.include_router(auth_routes.router)
@@ -48,7 +61,7 @@ app.include_router(auth_routes.router)
 app.include_router(patients_routes.router)
 
 # Define the tools
-tools = [query_fda_api, query_pubmed_api, query_usda_food_data, edit_patient_data, get_patient_data, add_medication, add_progress_note]
+tools = [query_fda_api, query_pubmed_api, query_usda_food_data]
 
 # Attach the tools to the model
 llm_with_tools = llm.bind_tools(tools)
@@ -79,13 +92,11 @@ def get_graph_with_tools(user_info=None, patient_info=None):
                 user_info_text += f"\n\nThe patient has the following chronic conditions:\n{patient_info['chronic_conditions']}"
                 
             user_info_text += f"\n\nYou should provide medical advice and information based on this patient's data. Remember to ALWAYS use patient ID {patient_info['id']} when using any patient-related tools."
-        
         # Add personalized information to system prompt
         personalized_content = f"{user_info_text}\n\n{system_content}"
-        
+
         # Create the personalized system prompt
         personalized_system_prompt = (system_type, personalized_content)
-        
         # Create the graph with the personalized system prompt
         return create_api_graph(
             llm_with_tools=llm_with_tools,
@@ -105,8 +116,76 @@ def get_graph_with_tools(user_info=None, patient_info=None):
 # Create the initial graph with the original system prompt
 graph_with_tools = get_graph_with_tools()
 
-# Store conversations by ID
-conversations: Dict[str, ApiState] = {}
+# Helper function to initialize conversation with proper system message
+def initialize_conversation(graph, system_prompt, include_welcome=True):
+    """
+    Initialize a conversation with the proper system message and optional welcome message.
+    
+    Args:
+        graph: The LangGraph instance
+        system_prompt: Tuple of (type, content) or just the content
+        include_welcome: Whether to include a welcome message
+        
+    Returns:
+        The initialized state
+    """
+    # Extract system content, handling different formats
+    if isinstance(system_prompt, tuple):
+        # Extract only the content part of the tuple, ignoring the type
+        system_content = system_prompt[1]
+    else:
+        system_content = system_prompt
+    
+    # Create initial messages
+    initial_messages = [SystemMessage(content=system_content)]
+    
+    # Add welcome message if requested
+    if include_welcome:
+        initial_messages.append(AIMessage(content=WELCOME_MSG))
+    
+    # Initialize the state with these messages
+    state = graph.invoke({"messages": initial_messages})
+    
+    # Debug: Print messages in the state
+    print("\n==== INITIAL STATE MESSAGES ====")
+    for msg in state["messages"]:
+        print(f"Message type: {type(msg).__name__}, content: {msg.content[:50]}...")
+    print("================================\n")
+    
+    return state
+
+# Store conversations by ID - use a more persistent approach
+import pickle
+import os
+
+# File to store conversations
+CONVERSATIONS_FILE = "conversations.pickle"
+
+# Load conversations from file if it exists
+def load_conversations():
+    if os.path.exists(CONVERSATIONS_FILE):
+        try:
+            with open(CONVERSATIONS_FILE, "rb") as f:
+                loaded_conversations = pickle.load(f)
+                print(f"Loaded {len(loaded_conversations)} conversations from file")
+                return loaded_conversations
+        except Exception as e:
+            print(f"Error loading conversations: {e}")
+    print("No saved conversations found, starting with empty dictionary")
+    return {}
+
+# Save conversations to file
+def save_conversations(conversations_dict):
+    try:
+        with open(CONVERSATIONS_FILE, "wb") as f:
+            pickle.dump(conversations_dict, f)
+        print(f"Saved {len(conversations_dict)} conversations to file")
+    except Exception as e:
+        print(f"Error saving conversations: {e}")
+
+# Initialize conversations
+conversations: Dict[str, ApiState] = load_conversations()
+print(f"Initialized conversations dictionary with {len(conversations)} items, id: {id(conversations)}")
 
 # Get welcome message
 @app.get("/welcome")
@@ -118,14 +197,25 @@ async def chat(request: PromptRequest, current_user: schemas.User = Depends(get_
     # Generate a new conversation ID if not provided
     conversation_id = request.conversation_id or str(uuid.uuid4())
     # Get or initialize conversation state
-
+    print("\n==== CHAT REQUEST ====")
+    print(f"Conversation ID: {conversation_id}")
+    print(f"Conversations dictionary ID: {id(conversations)}")
+    print(f"Conversations keys: {list(conversations.keys())}")
+    print(f"Request conversation_id provided: {request.conversation_id is not None}")
+    print(f"Request patient_id: {request.patient_id}")
+    # Initialize the conversation state if it doesn't exist
     if conversation_id not in conversations:
-        # Initialize with welcome message
-        state = graph_with_tools.invoke({"messages": []})
+        print(f"\n==== INITIALIZING NEW CONVERSATION: {conversation_id} ====")
+        # Use the helper function to initialize with system message and welcome message
+        state = initialize_conversation(graph_with_tools, DRUG_INTERACTION_BOT)
         conversations[conversation_id] = state
+        # Save conversations to file after initialization
+        save_conversations(conversations)
+        print(f"Conversations after initialization: {list(conversations.keys())}")
     else:
+        print(f"\n==== USING EXISTING CONVERSATION: {conversation_id} ====")
         state = conversations[conversation_id]
-    
+        print(f"Existing state messages count: {len(state['messages'])}")
     try:
         # Use the original user prompt without modification
         user_prompt = request.prompt
@@ -154,37 +244,47 @@ async def chat(request: PromptRequest, current_user: schemas.User = Depends(get_
                         'medications': patient.medications,
                         'chronic_conditions': patient.chronic_conditions
                     }
-                    print("\n==== PATIENT INFO ====")
-                    print(f"Patient ID: {patient_info['id']}")
-                    print(f"Name: {patient_info['first_name']} {patient_info['last_name']}")
-                    print(f"Chronic Conditions: {patient_info['chronic_conditions']}")
-                    print(f"Medications: {patient_info['medications']}")
-                    print("=====================\n")
-
             # Create a personalized graph with user and patient information
-            user_graph = get_graph_with_tools(user_info, patient_info)
+            if patient_info:
+                print(f"Creating personalized graph with patient info: {patient_info['first_name']} {patient_info['last_name']}")
+                user_graph = get_graph_with_tools(user_info, patient_info)
+            else:
+                print("Creating personalized graph with user info only (no patient info)")
+                user_graph = get_graph_with_tools(user_info, None)
             
-            # If it's a new conversation, initialize the state with the personalized graph
+            # Initialize the conversation state if it doesn't exist
             if conversation_id not in conversations:
-                state = user_graph.invoke({"messages": []})
+                # Get the system prompt safely from the graph config
+                system_prompt = user_graph.config.get("system_prompt", DRUG_INTERACTION_BOT)
+                
+                # Use the helper function to initialize with system message and welcome message
+                state = initialize_conversation(user_graph, system_prompt)
                 conversations[conversation_id] = state
-        
-        # Print request information
-        print(f"\n==== REQUEST INFO ====\nPatient ID in request: {request.patient_id}\nPrompt: {user_prompt}\n=====================\n")
         
         # Process the message with the appropriate graph
         if current_user:
+            print(f"\n==== PROCESSING MESSAGE WITH USER: {current_user.email} ====")
+            if request.patient_id:
+                print(f"Processing with patient ID: {request.patient_id}")
             # Use the personalized graph to process the message
             result_state = process_message(user_graph, state, user_prompt)
         else:
+            print("\n==== PROCESSING MESSAGE AS ANONYMOUS USER ====")
             # Use the original graph to process the message
             result_state = process_message(graph_with_tools, state, user_prompt)
         
         # Store the updated state
         conversations[conversation_id] = result_state
+        # Save conversations to file after update
+        save_conversations(conversations)
+        print(f"\n==== UPDATED CONVERSATION STATE ====")
+        print(f"Updated state messages count: {len(result_state['messages'])}")
+        print(f"Conversations after update: {list(conversations.keys())}")
+        print(f"Conversations dictionary ID after update: {id(conversations)}")
         
         # Get the bot's response (last message)
         bot_response = result_state["messages"][-1].content
+        print(f"Bot response: {bot_response[:50]}...")
         
         return BotResponse(
             response=bot_response,

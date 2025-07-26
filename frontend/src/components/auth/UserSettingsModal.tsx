@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react'; // Removed unused useEffect import
 import axios from 'axios';
 import { UserInfo } from '../../services/authService';
 import { BACKEND_URL } from '../../config';

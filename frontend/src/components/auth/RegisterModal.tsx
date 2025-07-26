@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { UserInfo } from '../../services/authService';
+// UserInfo import removed as it's not used
 import { BACKEND_URL } from '../../config';
 import './Auth.css';
 

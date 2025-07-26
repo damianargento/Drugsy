@@ -1,8 +1,11 @@
 import React, { useState, useEffect, FormEvent, ChangeEvent } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import authService from '../../services/authService';
 import './Auth.css';
 
 const ResetPassword: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [token, setToken] = useState('');
@@ -11,15 +14,14 @@ const ResetPassword: React.FC = () => {
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
-    const queryParams = new URLSearchParams(window.location.search);
-    const tokenParam = queryParams.get('token');
+    const tokenParam = searchParams.get('token');
     
     if (tokenParam) {
       setToken(tokenParam);
     } else {
       setError('Invalid or missing reset token');
     }
-  }, []);
+  }, [searchParams]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -59,7 +61,7 @@ const ResetPassword: React.FC = () => {
       setConfirmPassword('');
       
       setTimeout(() => {
-        window.location.href = '/login';
+        navigate('/login');
       }, 3000);
       
     } catch (err: any) {
@@ -108,7 +110,7 @@ const ResetPassword: React.FC = () => {
           <div className="form-actions">
             <button 
               type="button" 
-              onClick={() => window.history.back()} 
+              onClick={() => navigate('/login')} 
               className="cancel-button"
             >
               Cancel
@@ -124,7 +126,7 @@ const ResetPassword: React.FC = () => {
         </form>
         
         <div className="switch-form">
-          <button type="button" onClick={() => window.history.back()} className="text-button">
+          <button type="button" onClick={() => navigate('/login')} className="text-button">
             Back to Login
           </button>
         </div>

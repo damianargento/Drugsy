@@ -78,9 +78,12 @@ const removeUserInfo = () => {
 // Set auth header for axios requests
 const setAuthHeader = (token: string | null) => {
   if (token) {
+    // Set the token for all future axios requests
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    console.log('Authorization header set with token');
   } else {
     delete axios.defaults.headers.common['Authorization'];
+    console.log('Authorization header removed');
   }
 };
 
@@ -92,7 +95,10 @@ const initAuthHeader = () => {
 
 // Login user
 const login = async (email: string, password: string) => {
-  const response = await axios.post(`${BACKEND_URL}/token`, {
+  // Create a new axios instance for this request to avoid using potentially stale headers
+  const axiosInstance = axios.create();
+  
+  const response = await axiosInstance.post(`${BACKEND_URL}/token`, {
     username: email,
     password: password,
   });
@@ -103,10 +109,17 @@ const login = async (email: string, password: string) => {
   // Store both tokens
   setToken(accessToken);
   setRefreshToken(refreshToken);
+  
+  // Update the global axios headers
   setAuthHeader(accessToken);
   
-  // Get user info
-  const userResponse = await axios.get(`${BACKEND_URL}/users/me`);
+  // Get user info using the token directly in the request
+  const userResponse = await axios.get(`${BACKEND_URL}/users/me`, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`
+    }
+  });
+  
   setUserInfo(userResponse.data);
   
   return {
@@ -261,6 +274,7 @@ const authService = {
   deleteAccount,
   forgotPassword,
   resetPassword,
+  setAuthHeader, // Export setAuthHeader so it can be used directly
 };
 
 export default authService;

@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import axios from 'axios';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { BACKEND_URL } from './config';
 import './App.css';
 import './Chat.css';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { PatientProvider, usePatient } from './contexts/PatientContext';
-import { Patient } from './services/patientService';
+// Removed unused Patient import
 import Sidebar from './components/sidebar/Sidebar';
 import AuthButton from './components/auth/AuthButton';
+import ResetPassword from './components/auth/ResetPassword';
 
 // Message type definition
 interface Message {
@@ -16,7 +18,7 @@ interface Message {
   content: string;
 }
 
-function AppContent() {
+const AppContent: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -54,6 +56,14 @@ function AppContent() {
     setMessages([...messages, userMessage]);
     setInput('');
     setIsLoading(true);
+    
+    // Log authentication status before sending message
+    const authHeader = axios.defaults.headers.common['Authorization'];
+    console.log('Current auth status before sending message:', { 
+      authHeader: authHeader ? 'Set' : 'Not set',
+      isLoggedIn,
+      hasUserInfo: !!userInfo
+    });
 
     try {
       // Send message to the backend API using the config URL
@@ -63,7 +73,19 @@ function AppContent() {
         conversation_id: conversationId,
         patient_id: selectedPatient?.id
       });
+      
+      // Log the response to check if we're authenticated
+      console.log('Chat response received:', {
+        conversationId: response.data.conversation_id,
+        authenticated: response.data.authenticated !== false
+      });
 
+      // Save the conversation ID returned from the backend
+      if (response.data.conversation_id) {
+        console.log('Setting conversation ID:', response.data.conversation_id);
+        setConversationId(response.data.conversation_id);
+      }
+      
       // Add assistant response to the chat
       const assistantMessage: Message = {
         role: 'assistant',
@@ -154,7 +176,10 @@ function App() {
   return (
     <AuthProvider>
       <PatientProvider>
-        <AppContent />
+        <Routes>
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="*" element={<AppContent />} />
+        </Routes>
       </PatientProvider>
     </AuthProvider>
   );

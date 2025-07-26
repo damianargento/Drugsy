@@ -30,6 +30,9 @@ __pycache__/
 *.db
 *.sqlite3
 
+# Conversations
+/backend/conversations.pickle
+
 # Logs
 npm-debug.log*
 yarn-debug.log*

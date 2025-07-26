@@ -63,9 +63,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     authService.setRefreshToken(refreshToken);
     authService.setUserInfo(userInfo);
     
+    // Explicitly set the auth header to ensure it's updated immediately
+    authService.setAuthHeader(token);
+    
     // Update local state
     setIsLoggedIn(true);
     setUserInfo(userInfo);
+    
+    console.log('User logged in, auth header updated');
   };
 
   // Handle logout
