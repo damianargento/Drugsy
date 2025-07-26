@@ -4,7 +4,7 @@
   flex-direction: column;
   background-color: #141c20;
   color: white;
-  width: 100%;
+  width: auto;
   height: calc(100vh - 64px); /* Subtract header height */
   overflow: hidden; /* Prevent overflow from container */
   position: fixed;

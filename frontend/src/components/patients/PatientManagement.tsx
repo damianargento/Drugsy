@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import PatientSelector from './PatientSelector';
 import PatientForm from './PatientForm';
 import { Patient } from '../../services/patientService';
@@ -48,13 +49,10 @@ const PatientManagement: React.FC<PatientManagementProps> = ({ onPatientSelect, 
         onPatientSelect={onPatientSelect}
         selectedPatientId={selectedPatientId}
         onEditPatient={handleEditPatientClick}
+        onAddPatient={handleAddPatientClick}
       />
       
-      <button className="add-patient-btn sidebar-add-btn" onClick={handleAddPatientClick}>
-        Add Patient
-      </button>
-      
-      {showPatientModal && (
+      {showPatientModal && ReactDOM.createPortal(
         <div className="modal-overlay">
           <div className="modal-content">
             <button className="close-modal-btn" onClick={handleCancelPatientForm}>×</button>
@@ -65,7 +63,8 @@ const PatientManagement: React.FC<PatientManagementProps> = ({ onPatientSelect, 
               isEdit={isEditMode}
             />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
