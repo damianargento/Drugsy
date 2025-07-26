@@ -68,7 +68,7 @@
   padding: 10px;
   border-radius: 4px;
   margin: 10px 0;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .patient-selector-loading {
@@ -251,7 +251,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1100;
+  z-index: 11;
 }
 
 .delete-confirmation-content {
@@ -383,7 +383,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 1;
 }
 
 .close-modal-btn {
@@ -395,5 +395,5 @@
   font-size: 24px;
   cursor: pointer;
   color: #CBD5E0;
-  z-index: 10;
+  z-index: 1;
 }

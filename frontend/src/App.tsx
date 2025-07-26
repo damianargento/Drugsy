@@ -119,52 +119,53 @@ const AppContent: React.FC = () => {
         <AuthButton />
       </header>
       <main className="main">
-      {isLoggedIn && <Sidebar /> }
-      <div className="chat-container">
-      <div className="messages-container">
-        {messages.map((message, index) => (
-          <div 
-            key={index} 
-            className={`message ${message.role === 'user' ? 'user-message' : 'bot-message'}`}
-          >
-            <div className="message-content">
-              {message.role === 'assistant' ? (
-                <ReactMarkdown>{message.content}</ReactMarkdown>
-              ) : (
-                message.content
-              )}
-            </div>
+      {isLoggedIn && <Sidebar />}
+        <div className="content-wrapper">
+          <div className="chat-container">
+          <div className="messages-container">
+            {messages.map((message, index) => (
+              <div 
+                key={index} 
+                className={`message ${message.role === 'user' ? 'user-message' : 'bot-message'}`}
+              >
+                <div className="message-content">
+                  {message.role === 'assistant' ? (
+                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                  ) : (
+                    message.content
+                  )}
+                </div>
+              </div>
+            ))}
+            {isLoading && (
+              <div className="message bot-message">
+                <div className="message-content loading">
+                  <div className="loading-spinner"></div>
+                  <span>Thinking...</span>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
           </div>
-        ))}
-        {isLoading && (
-          <div className="message bot-message">
-            <div className="message-content loading">
-              <div className="loading-spinner"></div>
-              <span>Thinking...</span>
-            </div>
+          <div className="input-container">
+            <input
+              type="text"
+              placeholder="Ask about drug interactions with food..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyPress={handleKeyPress}
+              disabled={isLoading}
+              className="message-input"
+            />
+            <button 
+              onClick={handleSendMessage}
+              disabled={isLoading}
+              className="send-button"
+            >
+              {isLoading ? 'Sending...' : 'Send'}
+            </button>
           </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-      
-      <div className="input-container">
-        <input
-          type="text"
-          placeholder="Ask about drug interactions with food..."
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyPress={handleKeyPress}
-          disabled={isLoading}
-          className="message-input"
-        />
-        <button 
-          onClick={handleSendMessage}
-          disabled={isLoading}
-          className="send-button"
-        >
-          {isLoading ? 'Sending...' : 'Send'}
-        </button>
-      </div>
+    </div>
     </div>
     </main>
     </>
