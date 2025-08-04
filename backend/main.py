@@ -4,10 +4,15 @@ from typing import Dict, Any
 import uuid
 from models.llm import llm
 from models.chat_models import PromptRequest, BotResponse
-from tools.patient_edit_tool import edit_patient_data, get_patient_data, add_medication, add_progress_note
 from tools.fda_api import query_fda_api
 from tools.pubmed_api import query_pubmed_api
 from tools.usda_api import query_usda_food_data
+from tools.disease_prediction import (
+    diabetes_prediction_wrapper,
+    heart_disease_prediction_wrapper,
+    lung_cancer_prediction_wrapper,
+    thyroid_prediction_wrapper
+)
 from graph.api_graph import create_api_graph, ApiState, process_message
 from config.prompts import DRUG_INTERACTION_BOT, WELCOME_MSG
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
@@ -21,6 +26,7 @@ from database.auth import get_current_active_user, get_current_user_optional
 from database import schemas
 from routes import auth as auth_routes
 from routes import patients as patients_routes
+from routes import predictions as predictions_routes
 
 dotenv.load_dotenv()
 
@@ -60,8 +66,19 @@ app.include_router(auth_routes.router)
 # Include patient routes
 app.include_router(patients_routes.router)
 
+# Include prediction routes
+app.include_router(predictions_routes.router)
+
 # Define the tools
-tools = [query_fda_api, query_pubmed_api, query_usda_food_data]
+tools = [
+    query_fda_api, 
+    query_pubmed_api, 
+    query_usda_food_data, 
+    diabetes_prediction_wrapper,
+    heart_disease_prediction_wrapper,
+    lung_cancer_prediction_wrapper,
+    thyroid_prediction_wrapper
+]
 
 # Attach the tools to the model
 llm_with_tools = llm.bind_tools(tools)
@@ -78,7 +95,7 @@ def get_graph_with_tools(user_info=None, patient_info=None):
         # Add patient information if available
         if patient_info:
             user_info_text += f"\n\nYou are currently reviewing patient: {patient_info['first_name']} {patient_info['last_name']} (the ID of the patient is: {patient_info['id']})\n"
-            user_info_text += f"IMPORTANT: When using any patient-related tools, you MUST use the patient ID {patient_info['id']}. DO NOT make up an ID."
+            user_info_text += f"IMPORTANT: When using any patient-related tools, you MUST use the patient ID {patient_info['id']}. Never share the patient id with the user."
             
             # Add patient medication information if available
             if 'medications' in patient_info and patient_info['medications']:
@@ -279,9 +296,7 @@ async def chat(request: PromptRequest, current_user: schemas.User = Depends(get_
         save_conversations(conversations)
         print(f"\n==== UPDATED CONVERSATION STATE ====")
         print(f"Updated state messages count: {len(result_state['messages'])}")
-        print(f"Conversations after update: {list(conversations.keys())}")
-        print(f"Conversations dictionary ID after update: {id(conversations)}")
-        
+
         # Get the bot's response (last message)
         bot_response = result_state["messages"][-1].content
         print(f"Bot response: {bot_response[:50]}...")

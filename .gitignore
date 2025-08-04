@@ -32,6 +32,7 @@ __pycache__/
 
 # Conversations
 /backend/conversations.pickle
+/backend/models/model_cache.json
 
 # Logs
 npm-debug.log*
