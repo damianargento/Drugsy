@@ -5,7 +5,7 @@ import uuid
 from models.llm import llm
 from models.chat_models import PromptRequest, BotResponse
 from tools.fda_api import query_fda_api
-from tools.pubmed_api import query_pubmed_api
+from tools.query_pubmed_api import query_pubmed_api
 from tools.usda_api import query_usda_food_data
 from tools.disease_prediction import (
     diabetes_prediction_wrapper,
@@ -184,11 +184,9 @@ def load_conversations():
         try:
             with open(CONVERSATIONS_FILE, "rb") as f:
                 loaded_conversations = pickle.load(f)
-                print(f"Loaded {len(loaded_conversations)} conversations from file")
                 return loaded_conversations
         except Exception as e:
             print(f"Error loading conversations: {e}")
-    print("No saved conversations found, starting with empty dictionary")
     return {}
 
 # Save conversations to file
@@ -202,7 +200,6 @@ def save_conversations(conversations_dict):
 
 # Initialize conversations
 conversations: Dict[str, ApiState] = load_conversations()
-print(f"Initialized conversations dictionary with {len(conversations)} items, id: {id(conversations)}")
 
 # Get welcome message
 @app.get("/welcome")
@@ -286,8 +283,8 @@ async def chat(request: PromptRequest, current_user: schemas.User = Depends(get_
             # Use the personalized graph to process the message
             result_state = process_message(user_graph, state, user_prompt)
         else:
-            print("\n==== PROCESSING MESSAGE AS ANONYMOUS USER ====")
-            # Use the original graph to process the message
+            print(f"\n==== PROCESSING MESSAGE WITHOUT USER ====")
+            # Use the default graph to process the message
             result_state = process_message(graph_with_tools, state, user_prompt)
         
         # Store the updated state
