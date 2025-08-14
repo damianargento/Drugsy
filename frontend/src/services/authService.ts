@@ -1,19 +1,54 @@
 import axios from 'axios';
 import { BACKEND_URL } from '../config';
+import { jwtDecode } from 'jwt-decode';
 
-// Save token to local storage
+// Token interface
+interface DecodedToken {
+  exp: number;
+  sub: string;
+  token_type: string;
+}
+
+// Save access token to local storage
 const setToken = (token: string) => {
   localStorage.setItem('token', token);
 };
 
-// Get token from local storage
+// Get access token from local storage
 const getToken = (): string | null => {
   return localStorage.getItem('token');
 };
 
-// Remove token from local storage
+// Remove access token from local storage
 const removeToken = () => {
   localStorage.removeItem('token');
+};
+
+// Save refresh token to local storage
+const setRefreshToken = (token: string) => {
+  localStorage.setItem('refreshToken', token);
+};
+
+// Get refresh token from local storage
+const getRefreshToken = (): string | null => {
+  return localStorage.getItem('refreshToken');
+};
+
+// Remove refresh token from local storage
+const removeRefreshToken = () => {
+  localStorage.removeItem('refreshToken');
+};
+
+// Check if token is expired
+const isTokenExpired = (token: string): boolean => {
+  try {
+    const decoded = jwtDecode<DecodedToken>(token);
+    const currentTime = Date.now() / 1000;
+    return decoded.exp < currentTime;
+  } catch (error) {
+    console.error('Error decoding token:', error);
+    return true; // If there's an error decoding, consider the token expired
+  }
 };
 
 // Definir la interfaz para la información del usuario
@@ -22,12 +57,6 @@ export interface UserInfo {
   email: string;
   first_name: string;
   last_name: string;
-  medications?: Array<{
-    name: string;
-    dosage: string;
-    frequency: string;
-  }>;
-  chronic_conditions?: string;
 }
 
 // Save user info to local storage
@@ -49,9 +78,12 @@ const removeUserInfo = () => {
 // Set auth header for axios requests
 const setAuthHeader = (token: string | null) => {
   if (token) {
+    // Set the token for all future axios requests
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    console.log('Authorization header set with token');
   } else {
     delete axios.defaults.headers.common['Authorization'];
+    console.log('Authorization header removed');
   }
 };
 
@@ -63,23 +95,67 @@ const initAuthHeader = () => {
 
 // Login user
 const login = async (email: string, password: string) => {
-  const response = await axios.post(`${BACKEND_URL}/token`, {
+  // Create a new axios instance for this request to avoid using potentially stale headers
+  const axiosInstance = axios.create();
+  
+  const response = await axiosInstance.post(`${BACKEND_URL}/token`, {
     username: email,
     password: password,
   });
   
-  const token = response.data.access_token;
-  setToken(token);
-  setAuthHeader(token);
+  const accessToken = response.data.access_token;
+  const refreshToken = response.data.refresh_token;
   
-  // Get user info
-  const userResponse = await axios.get(`${BACKEND_URL}/users/me`);
+  // Store both tokens
+  setToken(accessToken);
+  setRefreshToken(refreshToken);
+  
+  // Update the global axios headers
+  setAuthHeader(accessToken);
+  
+  // Get user info using the token directly in the request
+  const userResponse = await axios.get(`${BACKEND_URL}/users/me`, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`
+    }
+  });
+  
   setUserInfo(userResponse.data);
   
   return {
-    token,
+    token: accessToken,
+    refreshToken,
     userInfo: userResponse.data
   };
+};
+
+// Refresh access token using refresh token
+const refreshToken = async (): Promise<string | null> => {
+  try {
+    const refreshToken = getRefreshToken();
+    
+    if (!refreshToken) {
+      return null;
+    }
+    
+    const response = await axios.post(`${BACKEND_URL}/token/refresh`, {
+      refresh_token: refreshToken
+    });
+    
+    const newAccessToken = response.data.access_token;
+    const newRefreshToken = response.data.refresh_token;
+    
+    // Store the new tokens
+    setToken(newAccessToken);
+    setRefreshToken(newRefreshToken);
+    setAuthHeader(newAccessToken);
+    
+    return newAccessToken;
+  } catch (error) {
+    // If refresh token is invalid or expired, logout the user
+    logout();
+    return null;
+  }
 };
 
 // Register user
@@ -96,13 +172,34 @@ const register = async (userData: {
 // Logout user
 const logout = () => {
   removeToken();
+  removeRefreshToken();
   removeUserInfo();
   setAuthHeader(null);
 };
 
 // Check if user is authenticated
 const isAuthenticated = (): boolean => {
-  return !!getToken();
+  const token = getToken();
+  return !!token && !isTokenExpired(token);
+};
+
+// Verify token validity and refresh if needed
+const verifyTokenAndRefresh = async (): Promise<boolean> => {
+  const token = getToken();
+  
+  // If no token exists, user is not authenticated
+  if (!token) {
+    return false;
+  }
+  
+  // If token is not expired, user is authenticated
+  if (!isTokenExpired(token)) {
+    return true;
+  }
+  
+  // If token is expired, try to refresh it
+  const newToken = await refreshToken();
+  return !!newToken;
 };
 
 // Actualizar información del usuario
@@ -120,17 +217,64 @@ const updateUserSettings = async (userData: Partial<UserInfo>, token: string) =>
   return response.data;
 };
 
+// Delete user account and all associated data
+const deleteAccount = async (): Promise<{ message: string }> => {
+  try {
+    const response = await axios.delete(`${BACKEND_URL}/users/me`);
+    // Logout after successful account deletion
+    logout();
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting account:', error);
+    throw error;
+  }
+};
+
+// Request password reset
+const forgotPassword = async (email: string): Promise<{ message: string }> => {
+  try {
+    const response = await axios.post(`${BACKEND_URL}/forgot-password`, { email });
+    return response.data;
+  } catch (error) {
+    console.error('Error requesting password reset:', error);
+    throw error;
+  }
+};
+
+// Reset password with token
+const resetPassword = async (token: string, new_password: string): Promise<{ message: string }> => {
+  try {
+    const response = await axios.post(`${BACKEND_URL}/reset-password`, {
+      token,
+      new_password
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error resetting password:', error);
+    throw error;
+  }
+};
+
 const authService = {
   login,
   register,
   logout,
   getToken,
+  getRefreshToken,
   getUserInfo,
   isAuthenticated,
   initAuthHeader,
   setToken,
+  setRefreshToken,
   setUserInfo,
   updateUserSettings,
+  isTokenExpired,
+  refreshToken,
+  verifyTokenAndRefresh,
+  deleteAccount,
+  forgotPassword,
+  resetPassword,
+  setAuthHeader, // Export setAuthHeader so it can be used directly
 };
 
 export default authService;

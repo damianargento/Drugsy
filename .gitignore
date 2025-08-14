@@ -32,7 +32,15 @@ __pycache__/
 *.db
 *.sqlite3
 
+# Conversations
+/backend/conversations.pickle
+/backend/models/model_cache.json
+
 # Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+backend/config/__pycache__/prompts.cpython-313.pyc
 *.log
 
 # scripts

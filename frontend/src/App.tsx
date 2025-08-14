@@ -1,11 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
+import axios from 'axios';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { BACKEND_URL } from './config';
 import './App.css';
 import './Chat.css';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { PatientProvider, usePatient } from './contexts/PatientContext';
+// Removed unused Patient import
+import Sidebar from './components/sidebar/Sidebar';
 import AuthButton from './components/auth/AuthButton';
-import authService from './services/authService';
+import ResetPassword from './components/auth/ResetPassword';
 
 // Message type definition
 interface Message {
@@ -13,13 +18,13 @@ interface Message {
   content: string;
 }
 
-function App() {
+const AppContent: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userInfo, setUserInfo] = useState<any>(null);
+  const { isLoggedIn, userInfo } = useAuth();
+  const { selectedPatient } = usePatient();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Scroll to bottom of messages
@@ -31,35 +36,16 @@ function App() {
     scrollToBottom();
   }, [messages]);
 
-  // Initialize authentication state from local storage
+  // Add welcome message when component mounts
   useEffect(() => {
-    authService.initAuthHeader();
-    const token = authService.getToken();
-    const storedUserInfo = authService.getUserInfo();
-    
-    if (token && storedUserInfo) {
-      setIsLoggedIn(true);
-      setUserInfo(storedUserInfo);
-    }
+    setMessages([
+      {
+        role: 'assistant',
+        content: "Hello! I'm Drugsy! I'm here to help doctors manage their patients' medications and provide information about drug interactions, side effects, and dietary recommendations. If you select a patient, I will provide personalized advice based on their medications and chronic conditions."
+      }
+    ]);
   }, []);
 
-  // Handle login
-  const handleLogin = (token: string, userInfo: any) => {
-    // Guardar el token y la información del usuario en localStorage
-    authService.setToken(token);
-    authService.setUserInfo(userInfo);
-    
-    // Actualizar el estado local
-    setIsLoggedIn(true);
-    setUserInfo(userInfo);
-  };
-
-  // Handle logout
-  const handleLogout = () => {
-    authService.logout();
-    setIsLoggedIn(false);
-    setUserInfo(null);
-  };
 
   // Handle sending a message
   const handleSendMessage = async () => {
@@ -70,32 +56,42 @@ function App() {
     setMessages([...messages, userMessage]);
     setInput('');
     setIsLoading(true);
+    
+    // Log authentication status before sending message
+    const authHeader = axios.defaults.headers.common['Authorization'];
+    console.log('Current auth status before sending message:', { 
+      authHeader: authHeader ? 'Set' : 'Not set',
+      isLoggedIn,
+      hasUserInfo: !!userInfo
+    });
 
     try {
-      // Obtenemos el token
-      const token = authService.getToken();
-      
       // Send message to the backend API using the config URL
+      // Axios will automatically use the Authorization header set by our interceptors
       const response = await axios.post(`${BACKEND_URL}/chat`, {
         prompt: input,
         conversation_id: conversationId,
-      }, {
-        headers: {
-          'Authorization': token ? `Bearer ${token}` : '',
-        }
+        patient_id: selectedPatient?.id
+      });
+      
+      // Log the response to check if we're authenticated
+      console.log('Chat response received:', {
+        conversationId: response.data.conversation_id,
+        authenticated: response.data.authenticated !== false
       });
 
-      // Save the conversation ID for future messages
-      if (!conversationId) {
+      // Save the conversation ID returned from the backend
+      if (response.data.conversation_id) {
+        console.log('Setting conversation ID:', response.data.conversation_id);
         setConversationId(response.data.conversation_id);
       }
-
+      
       // Add assistant response to the chat
       const assistantMessage: Message = {
         role: 'assistant',
         content: response.data.response,
       };
-      setMessages(prev => [...prev, assistantMessage]);
+      setMessages(prevMessages => [...prevMessages, assistantMessage]);
     } catch (error) {
       console.error('Error sending message:', error);
       // Add error message
@@ -103,7 +99,7 @@ function App() {
         role: 'assistant',
         content: 'Sorry, there was an error processing your request. Please try again.',
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prevMessages => [...prevMessages, errorMessage]);
     } finally {
       setIsLoading(false);
     }
@@ -116,92 +112,77 @@ function App() {
     }
   };
 
-  // Get welcome message from backend when component mounts
-  useEffect(() => {
-    const getWelcomeMessage = async () => {
-      try {
-        const response = await axios.get(`${BACKEND_URL}/welcome`, {
-          headers: {
-            'Authorization': isLoggedIn ? `Bearer ${authService.getToken()}` : undefined,
-          }
-        });
-        setMessages([
-          {
-            role: 'assistant',
-            content: response.data.welcome_message,
-          },
-        ]);
-      } catch (error) {
-        console.error('Error fetching welcome message:', error);
-        // Fallback welcome message if API call fails
-        setMessages([
-          {
-            role: 'assistant',
-            content: 'Hello! Welcome to Drugsy. How can I help you today?',
-          },
-        ]);
-      }
-    };
-    
-    getWelcomeMessage();
-  }, []);
-
   return (
-    <div className="chat-container">
+    <>
       <header className="header">
         <img src="/images/logo.png" alt="Drugsy Logo" className="logo" />
-        <AuthButton 
-          isLoggedIn={isLoggedIn}
-          userInfo={userInfo}
-          onLogin={handleLogin}
-          onLogout={handleLogout}
-        />
+        <AuthButton />
       </header>
-      <div className="messages-container">
-        {messages.map((message, index) => (
-          <div 
-            key={index} 
-            className={`message ${message.role === 'user' ? 'user-message' : 'bot-message'}`}
-          >
-            <div className="message-content">
-              {message.role === 'assistant' ? (
-                <ReactMarkdown>{message.content}</ReactMarkdown>
-              ) : (
-                message.content
-              )}
-            </div>
+      <main className="main">
+      {isLoggedIn && <Sidebar />}
+        <div className="content-wrapper">
+          <div className="chat-container">
+          <div className="messages-container">
+            {messages.map((message, index) => (
+              <div 
+                key={index} 
+                className={`message ${message.role === 'user' ? 'user-message' : 'bot-message'}`}
+              >
+                <div className="message-content">
+                  {message.role === 'assistant' ? (
+                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                  ) : (
+                    message.content
+                  )}
+                </div>
+              </div>
+            ))}
+            {isLoading && (
+              <div className="message bot-message">
+                <div className="message-content loading">
+                  <div className="loading-spinner"></div>
+                  <span>Thinking...</span>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
           </div>
-        ))}
-        {isLoading && (
-          <div className="message bot-message">
-            <div className="message-content loading">
-              <div className="loading-spinner"></div>
-              <span>Thinking...</span>
-            </div>
+          <div className="input-container">
+            <input
+              type="text"
+              placeholder="Ask about drug interactions with food..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyPress={handleKeyPress}
+              disabled={isLoading}
+              className="message-input"
+            />
+            <button 
+              onClick={handleSendMessage}
+              disabled={isLoading}
+              className="send-button"
+            >
+              {isLoading ? 'Sending...' : 'Send'}
+            </button>
           </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-      
-      <div className="input-container">
-        <input
-          type="text"
-          placeholder="Ask about drug interactions with food..."
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyPress={handleKeyPress}
-          disabled={isLoading}
-          className="message-input"
-        />
-        <button 
-          onClick={handleSendMessage}
-          disabled={isLoading}
-          className="send-button"
-        >
-          {isLoading ? 'Sending...' : 'Send'}
-        </button>
-      </div>
     </div>
+    </div>
+    </main>
+    </>
+  );
+}
+
+// Wrap the app with AuthProvider and PatientProvider
+function App() {
+  return (
+    <AuthProvider>
+      <PatientProvider>
+        <Routes>
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="*" element={<AppContent />} />
+        </Routes>
+      </PatientProvider>
+    </AuthProvider>
   );
 }
 

@@ -1,29 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import LoginModal from './LoginModal';
 import RegisterModal from './RegisterModal';
 import UserMenu from './UserMenu';
 import UserSettingsModal from './UserSettingsModal';
+import ForgotPasswordModal from './ForgotPasswordModal';
+import ResetPasswordModal from './ResetPasswordModal';
+import { useAuth } from '../../contexts/AuthContext';
 import { UserInfo } from '../../services/authService';
 import './Auth.css';
 
 // Usar la interfaz UserInfo importada del servicio de autenticación
 
-interface AuthButtonProps {
-  isLoggedIn: boolean;
-  userInfo: UserInfo | null;
-  onLogin: (token: string, userInfo: UserInfo) => void;
-  onLogout: () => void;
-}
+// No longer need props as we're using context
 
-const AuthButton: React.FC<AuthButtonProps> = ({ 
-  isLoggedIn, 
-  userInfo, 
-  onLogin, 
-  onLogout 
-}) => {
+const AuthButton: React.FC = () => {
+  const { isLoggedIn, userInfo, login, logout } = useAuth();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
+  const [resetToken, setResetToken] = useState('');
 
   const handleLoginClick = () => {
     setShowLoginModal(true);
@@ -34,16 +31,36 @@ const AuthButton: React.FC<AuthButtonProps> = ({
   };
 
   const handleLogout = () => {
-    onLogout();
+    logout();
   };
 
   const handleSettingsClick = () => {
     setShowSettingsModal(true);
   };
 
+  const handleForgotPasswordClick = () => {
+    setShowLoginModal(false);
+    setShowForgotPasswordModal(true);
+  };
+  
+  // Check URL for reset token on component mount
+  useEffect(() => {
+    const queryParams = new URLSearchParams(window.location.search);
+    const tokenParam = queryParams.get('token');
+    
+    if (tokenParam) {
+      setResetToken(tokenParam);
+      setShowResetPasswordModal(true);
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
   const handleUpdateSuccess = (updatedUserInfo: UserInfo) => {
-    // Actualizar la información del usuario en el estado global
-    onLogin(localStorage.getItem('token') || '', updatedUserInfo);
+    // Update user info in global state
+    const token = localStorage.getItem('token') || '';
+    const refreshToken = localStorage.getItem('refreshToken') || '';
+    login(token, refreshToken, updatedUserInfo);
   };
 
   return (
@@ -72,23 +89,25 @@ const AuthButton: React.FC<AuthButtonProps> = ({
       {showLoginModal && (
         <LoginModal
           onClose={() => setShowLoginModal(false)}
-          onLogin={onLogin}
+          onLogin={(token, refreshToken, userInfo) => {
+            login(token, refreshToken, userInfo);
+          }}
           onRegisterClick={() => {
             setShowLoginModal(false);
             setShowRegisterModal(true);
           }}
+          onForgotPasswordClick={handleForgotPasswordClick}
         />
       )}
 
       {showRegisterModal && (
         <RegisterModal
           onClose={() => setShowRegisterModal(false)}
-          onRegister={(token: string, userInfo: any) => {
-            onLogin(token, userInfo);
+          onRegister={(token: string, refreshToken: string, userInfo: any) => {
+            login(token, refreshToken, userInfo);
             setShowRegisterModal(false);
           }}
           onLoginClick={() => {
-            setShowRegisterModal(false);
             setShowLoginModal(true);
           }}
         />
@@ -100,6 +119,27 @@ const AuthButton: React.FC<AuthButtonProps> = ({
           userInfo={userInfo}
           token={localStorage.getItem('token') || ''}
           onUpdateSuccess={handleUpdateSuccess}
+        />
+      )}
+
+      {showForgotPasswordModal && (
+        <ForgotPasswordModal
+          onClose={() => setShowForgotPasswordModal(false)}
+          onLoginClick={() => {
+            setShowForgotPasswordModal(false);
+            setShowLoginModal(true);
+          }}
+        />
+      )}
+
+      {showResetPasswordModal && (
+        <ResetPasswordModal
+          onClose={() => setShowResetPasswordModal(false)}
+          onLoginClick={() => {
+            setShowResetPasswordModal(false);
+            setShowLoginModal(true);
+          }}
+          token={resetToken}
         />
       )}
     </div>
