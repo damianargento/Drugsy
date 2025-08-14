@@ -302,10 +302,73 @@
   width: 100%;
 }
 
-.medication-fields input {
+.progress-note-fields {
+  display: grid;
+  grid-template-columns: 2fr 1fr 0.2fr;
+  flex: 1;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 15px;
+}
+
+.edit-toggle-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6c757d;
+  transition: all 0.2s ease;
+}
+
+.edit-toggle-btn:hover {
+  background-color: rgba(108, 117, 125, 0.1);
+  color: #495057;
+}
+
+.edit-toggle-btn.active {
+  color: #0d6efd;
+  background-color: rgba(13, 110, 253, 0.1);
+}
+
+.progress-note-content {
+  flex: 2;
+  min-height: 60px;
+  padding: 8px 12px;
+  background-color: #2a2a2a;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.progress-note-date {
+  flex: 1;
+  min-width: 120px;
+  padding: 8px 12px;
+  background-color: #2a2a2a;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.progress-note-fields input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(2);
+  cursor: pointer;
+}
+
+.medication-fields input,.progress-note-fields input {
   flex: 1;
   min-width: 100px;
-  padding: 8px;
+  padding: 10px;
   border: 1px solid #4A5568;
   border-radius: 4px;
   font-size: 14px;

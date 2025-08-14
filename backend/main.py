@@ -7,12 +7,6 @@ from models.chat_models import PromptRequest, BotResponse
 from tools.fda_api import query_fda_api
 from tools.query_pubmed_api import query_pubmed_api
 from tools.usda_api import query_usda_food_data
-from tools.disease_prediction import (
-    diabetes_prediction_wrapper,
-    heart_disease_prediction_wrapper,
-    lung_cancer_prediction_wrapper,
-    thyroid_prediction_wrapper
-)
 from graph.api_graph import create_api_graph, ApiState, process_message
 from config.prompts import DRUG_INTERACTION_BOT, WELCOME_MSG
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
@@ -26,7 +20,6 @@ from database.auth import get_current_active_user, get_current_user_optional
 from database import schemas
 from routes import auth as auth_routes
 from routes import patients as patients_routes
-from routes import predictions as predictions_routes
 
 dotenv.load_dotenv()
 
@@ -66,18 +59,11 @@ app.include_router(auth_routes.router)
 # Include patient routes
 app.include_router(patients_routes.router)
 
-# Include prediction routes
-app.include_router(predictions_routes.router)
-
 # Define the tools
 tools = [
     query_fda_api, 
     query_pubmed_api, 
-    query_usda_food_data, 
-    diabetes_prediction_wrapper,
-    heart_disease_prediction_wrapper,
-    lung_cancer_prediction_wrapper,
-    thyroid_prediction_wrapper
+    query_usda_food_data
 ]
 
 # Attach the tools to the model
@@ -107,6 +93,15 @@ def get_graph_with_tools(user_info=None, patient_info=None):
             # Add the patient chronic conditions if available
             if 'chronic_conditions' in patient_info and patient_info['chronic_conditions']:
                 user_info_text += f"\n\nThe patient has the following chronic conditions:\n{patient_info['chronic_conditions']}"
+
+            # Add patient progress notes if available
+            if 'progress_notes' in patient_info and patient_info['progress_notes']:
+                progress_notes_text = "\n\nThe patient has the following progress notes:\n"
+                for note in patient_info['progress_notes']:
+                    date_str = note.get('date', 'No date')
+                    content = note.get('content', 'No content')
+                    progress_notes_text += f"- {date_str}: {content}\n"
+                user_info_text += progress_notes_text
                 
             user_info_text += f"\n\nYou should provide medical advice and information based on this patient's data. Remember to ALWAYS use patient ID {patient_info['id']} when using any patient-related tools."
         # Add personalized information to system prompt
@@ -251,13 +246,32 @@ async def chat(request: PromptRequest, current_user: schemas.User = Depends(get_
                 db = next(get_db())
                 patient = get_patient_by_id(db, request.patient_id, current_user.id)
                 if patient:
-                    patient_info = {
-                        'first_name': patient.first_name,
-                        'last_name': patient.last_name,
-                        'id': patient.id,
-                        'medications': patient.medications,
-                        'chronic_conditions': patient.chronic_conditions
-                    }
+                    try:
+                        # Parse progress_notes if it exists and is not None
+                        progress_notes = []
+                        if patient.progress_notes:
+                            try:
+                                if isinstance(patient.progress_notes, str):
+                                    import json
+                                    progress_notes = json.loads(patient.progress_notes)
+                                else:
+                                    progress_notes = patient.progress_notes
+                            except (json.JSONDecodeError, TypeError) as e:
+                                print(f"Error parsing progress_notes: {e}")
+                                progress_notes = []
+                        
+                        patient_info = {
+                            'first_name': patient.first_name,
+                            'last_name': patient.last_name,
+                            'id': patient.id,
+                            'medications': patient.medications,
+                            'chronic_conditions': patient.chronic_conditions,
+                            'progress_notes': progress_notes,
+                        }
+                        print(f"Successfully created patient_info for patient {patient.id}")
+                    except Exception as e:
+                        print(f"Error creating patient_info: {e}")
+                        raise e
             # Create a personalized graph with user and patient information
             if patient_info:
                 print(f"Creating personalized graph with patient info: {patient_info['first_name']} {patient_info['last_name']}")
@@ -286,7 +300,7 @@ async def chat(request: PromptRequest, current_user: schemas.User = Depends(get_
             print(f"\n==== PROCESSING MESSAGE WITHOUT USER ====")
             # Use the default graph to process the message
             result_state = process_message(graph_with_tools, state, user_prompt)
-        
+
         # Store the updated state
         conversations[conversation_id] = result_state
         # Save conversations to file after update

@@ -41,6 +41,7 @@ export interface PatientUpdate {
   date_of_birth?: string;
   medications?: Medication[];
   chronic_conditions?: string;
+  progress_notes?: ProgressNote[];
 }
 
 export interface ProgressNoteCreate {

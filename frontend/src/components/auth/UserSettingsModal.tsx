@@ -117,10 +117,7 @@ const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
               onChange={(e) => setEmail(e.target.value)}
               required
             />
-          </div>
-          
-          {/* Medications and chronic conditions fields removed */}
-          
+          </div>          
           <div className="button-group">
             <button
               type="button"

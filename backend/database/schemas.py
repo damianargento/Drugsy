@@ -84,6 +84,7 @@ class PatientUpdate(BaseModel):
     date_of_birth: Optional[date] = None
     medications: Optional[List[Medication]] = None
     chronic_conditions: Optional[str] = None
+    progress_notes: Optional[List[ProgressNote]] = None
 
 # Schema for adding a progress note
 class ProgressNoteCreate(BaseModel):

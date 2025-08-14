@@ -1,9 +1,17 @@
 from sqlalchemy.orm import Session
 from . import models, schemas
 from fastapi import HTTPException, status
-from typing import Optional, List
-from datetime import datetime, timedelta
+from typing import Optional, List, Any
+from datetime import datetime, timedelta, date
 import secrets
+import json
+
+# Custom JSON encoder to handle datetime objects
+class DateTimeEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (datetime, date)):
+            return obj.isoformat()
+        return super().default(obj)
 
 def get_user_by_email(db: Session, email: str):
     return db.query(models.User).filter(models.User.email == email).first()
@@ -152,10 +160,30 @@ def create_patient(db: Session, patient: schemas.PatientCreate, doctor_id: int):
     # Convert progress_notes to the right format if provided
     if patient_data.get('progress_notes'):
         patient_data['progress_notes'] = [note.dict() for note in patient_data['progress_notes']]
+        # Convert datetime objects in progress notes to JSON-serializable format
+        patient_data['progress_notes'] = json.loads(
+            json.dumps(patient_data['progress_notes'], cls=DateTimeEncoder)
+        )
     
     # Convert medications to the right format if provided
     if patient_data.get('medications'):
         patient_data['medications'] = [med.dict() for med in patient_data['medications']]
+    
+    # Handle date_of_birth - convert string to date object if provided
+    if patient_data.get('date_of_birth') is not None:
+        try:
+            # If it's already a date object, keep it as is
+            if not isinstance(patient_data['date_of_birth'], date):
+                # Try to parse the date string in ISO format (YYYY-MM-DD)
+                patient_data['date_of_birth'] = date.fromisoformat(patient_data['date_of_birth'])
+        except (ValueError, TypeError) as e:
+            # If date parsing fails, log the error
+            print(f"Error parsing date_of_birth: {e}")
+            # Don't create the patient if we can't parse the date_of_birth
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid date format for date_of_birth: {patient_data['date_of_birth']}"
+            )
     
     # Create patient object
     db_patient = models.Patient(**patient_data, doctor_id=doctor_id)
@@ -187,6 +215,36 @@ def update_patient(db: Session, patient_id: int, doctor_id: int, patient_data: s
             if hasattr(update_data['medications'][0], 'dict'):
                 update_data['medications'] = [med.dict() for med in update_data['medications']]
             # If they're already dictionaries, leave them as is
+    
+    # Handle progress notes if provided
+    if update_data.get('progress_notes') is not None:
+        # Handle empty list case
+        if len(update_data['progress_notes']) == 0:
+            update_data['progress_notes'] = []
+        else:
+            # Check if progress notes are already dictionaries or Pydantic models
+            if hasattr(update_data['progress_notes'][0], 'dict'):
+                update_data['progress_notes'] = [note.dict() for note in update_data['progress_notes']]
+            
+            # Convert progress_notes to JSON-serializable format using our custom DateTimeEncoder
+            update_data['progress_notes'] = json.loads(
+                json.dumps(update_data['progress_notes'], cls=DateTimeEncoder)
+            )
+    
+    # Handle date_of_birth - convert string to date object if provided
+    if update_data.get('date_of_birth') is not None:
+        try:
+            # If it's already a date object, keep it as is
+            if not isinstance(update_data['date_of_birth'], date):
+                # Try to parse the date string in ISO format (YYYY-MM-DD)
+                update_data['date_of_birth'] = date.fromisoformat(update_data['date_of_birth'])
+        except (ValueError, TypeError) as e:
+            # If date parsing fails, log the error and keep the original value
+            print(f"Error parsing date_of_birth: {e}")
+            # Don't update the field if we can't parse it
+            del update_data['date_of_birth']
+    
+    # Apply all updates at once after processing all fields
     for key, value in update_data.items():
         if value is not None:  # Only update fields that are not None
             setattr(db_patient, key, value)

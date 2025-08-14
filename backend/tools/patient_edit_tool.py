@@ -34,11 +34,13 @@ def edit_patient_data(patient_id: int, update_data: str) -> str:
                     - date_of_birth: Date of birth in YYYY-MM-DD format
                     - chronic_conditions: Text describing chronic conditions
                     - medications: List of medication objects with name, dosage, and frequency
+                    - progress_notes: List of progress note objects with date and content
     
     EXAMPLES:
         - Update name: '{"first_name": "John", "last_name": "Smith"}'
         - Update medications: '{"medications": [{"name": "Aspirin", "dosage": "100mg", "frequency": "daily"}]}'
         - Update chronic conditions: '{"chronic_conditions": "Hypertension, Diabetes"}'
+        - Update progress notes: '{"progress_notes": [{"date": "2023-01-01", "content": "Patient is feeling well"}]}'
     
     RETURNS:
         A dictionary with the updated patient data or an error message
